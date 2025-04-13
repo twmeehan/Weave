@@ -1,11 +1,10 @@
 export class Mesh {
     constructor(gl, positions, indices = null) {
-        
-        console.log(gl);
-        
+                
         this.gl = gl;
         this.vertexCount = indices ? indices.length : positions.length / 3;
         this.useIndices = !!indices;
+        this.color = null;
     
         // Create and bind VAO
         this.vao = gl.createVertexArray();
@@ -35,13 +34,24 @@ export class Mesh {
     }
   
     draw() {
+
+      
       const gl = this.gl;
+      const program = gl.getParameter(gl.CURRENT_PROGRAM);
+      const uColor = gl.getUniformLocation(program, "uColor");
+      gl.uniform4fv(uColor, this.color ? this.color.toArray() : [1,1,1,1]);
+
+      // Bind the VAO that already has position/color/index data
       gl.bindVertexArray(this.vao);
+    
+      // Choose the right draw call based on whether we're using indices
       if (this.useIndices) {
         gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
       } else {
         gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
       }
+    
+      // Clean up (optional)
       gl.bindVertexArray(null);
     }
-  }
+}

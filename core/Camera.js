@@ -2,121 +2,129 @@ import { Mat4 } from '../math/Mat4.js';
 import { Vec3 } from '../math/Vec3.js';
 import { GameObject } from './GameObject.js';
 
-export class Camera extends GameObject{
-    static ORTHOGRAPHIC = 0;
-    static PERSPECTIVE = 1;
-    constructor(cameraType = Camera.PERSPECTIVE, position = new Vec3(5, 5, 5), target = new Vec3(0, 0, 0), fov = Math.PI / 4, near = 0.1, far = 100) {
-
-        super(position);
-        this.cameraType = cameraType;
-        this.lookAt(target);
-        this.updateProjectionMatrix(fov, window.innerWidth / window.innerHeight, near, far);
-    }
-
-    updateWorldMatrix(updateObjectToParentMatrix = true) {
-        super.updateWorldMatrix(updateObjectToParentMatrix);
-        this.updateViewMatrix();
-    }
-
-    updateProjectionMatrix(fov, aspect, near, far) {
-        if (this.cameraType = Camera.ORTHOGRAPHIC) {
-            const top = Math.tan(fov / 2) * near;
-            const bottom = -top;
-            const right = top * aspect;
-            const left = -right;
-
-            const lr = 1 / (left - right);
-            const bt = 1 / (bottom - top);
-            const nf = 1 / (near - far);
-
-            const m = new Mat4();
-            m.elements = [
-                -2 * lr,     0,         0,              0,
-                 0,        -2 * bt,     0,              0,
-                 0,         0,        2 * nf,           0,
-                (left + right) * lr, (top + bottom) * bt, (far + near) * nf, 1
-            ];
-            this.projection = m;
-        } else {
-            const f = 1.0 / Math.tan(fov / 2);
-            const rangeInv = 1.0 / (near - far);
-
-            const m = new Mat4();
-            m.elements = [
-                f / aspect, 0, 0, 0,
-                0, f, 0, 0,
-                0, 0, (near + far) * rangeInv, -1,
-                0, 0, near * far * rangeInv * 2, 0
-            ];
-            this.projectionMatrix = m;
-        }
-    }
-
-    updateViewMatrix() {
-        const { position, rotation } = this.transform;
-      
-        // Create forward vector from yaw (y), pitch (x), roll (z)
-        const cosPitch = Math.cos(rotation.x);
-        const sinPitch = Math.sin(rotation.x);
-        const cosYaw = Math.cos(rotation.y);
-        const sinYaw = Math.sin(rotation.y);
-      
-        const forward = new Vec3(
-          sinYaw * cosPitch,
-          sinPitch,
-          -cosYaw * cosPitch
-        ).normalize();
-      
-        // Right vector (camera's local X axis)
-        const right = new Vec3(
-          Math.cos(rotation.y),
-          0,
-          Math.sin(rotation.y)
-        ).normalize();
-      
-        // Up vector (default up rotated around forward by roll)
-        const defaultUp = new Vec3(0, 1, 0);
-        const roll = rotation.z;
-        const up = this.rotateVectorAroundAxis(defaultUp, forward, roll);
-      
-        // Build a view matrix manually from basis vectors and position
-        const fx = forward.x, fy = forward.y, fz = forward.z;
-        const rx = right.x, ry = right.y, rz = right.z;
-        const ux = up.x,    uy = up.y,    uz = up.z;
-        const px = position.x, py = position.y, pz = position.z;
-      
-        const m = new Mat4();
-        m.elements = [
-           rx,  ux,  fx, 0,
-           ry,  uy,  fy, 0,
-           rz,  uz,  fz, 0,
-          -right.dot(position), -up.dot(position), -forward.dot(position), 1
-        ];
-      
-        this.viewMatrix = m;
-      }
+export class Camera extends GameObject {
+  static ORTHOGRAPHIC = 0;
+  static PERSPECTIVE = 1;
   
-    rotateVectorAroundAxis(v, axis, angle) {
-        const cosA = Math.cos(angle);
-        const sinA = Math.sin(angle);
+  constructor(
+    cameraType = Camera.PERSPECTIVE, 
+    position = new Vec3(5, 5, 5), 
+    target = new Vec3(0, 0, 0), 
+    fov = Math.PI / 4, 
+    near = 0.1, 
+    far = 100
+  ) {
+    super(position);
+    this.cameraType = cameraType;
+    this.viewMatrix = null;
+    this.projectionMatrix = null;
+    // Store the look-at target in case you want to update the view later.
+    this.lookAtTarget = target.clone();
+    this.lookAt(target);
+    this.updateProjectionMatrix(fov, window.innerWidth / window.innerHeight, near, far);
+  }
   
-        const term1 = v.multiply(cosA);
-        const term2 = axis.cross(v).multiply(sinA);
-        const term3 = axis.multiply(axis.dot(v) * (1 - cosA));
+  updateWorldMatrix(updateObjectToParentMatrix = true) {
+    super.updateWorldMatrix(updateObjectToParentMatrix);
+    this.updateViewMatrix();
+  }
+
+  updateProjectionMatrix(fov, aspect, near, far) {
+    if (this.cameraType === Camera.ORTHOGRAPHIC) {
+        // For orthographic projection (row-major):
+        const top = Math.tan(fov / 2) * near;
+        const bottom = -top;
+        const right = top * aspect;
+        const left = -right;
+        // Standard orthographic matrix in row-major order:
+        // Row0: [2/(right-left), 0, 0, -(right+left)/(right-left)]
+        // Row1: [0, 2/(top-bottom), 0, -(top+bottom)/(top-bottom)]
+        // Row2: [0, 0, -2/(far-near), -(far+near)/(far-near)]
+        // Row3: [0, 0, 0, 1]
+        const m = new Mat4(
+            2 / (right - left), 0, 0, -(right + left) / (right - left),
+            0, 2 / (top - bottom), 0, -(top + bottom) / (top - bottom),
+            0, 0, -2 / (far - near), -(far + near) / (far - near),
+            0, 0, 0, 1
+        );
+        this.projectionMatrix = m;
+    } else {
+        // Perspective projection in row-major order.
+        // The typical OpenGL perspective projection (column-major) is:
+        // [ f/aspect,  0,              0,                         0,
+        //   0,         f,              0,                         0,
+        //   0,         0,  (far+near)/(near-far), (2*far*near)/(near-far),
+        //   0,         0,             -1,                         0 ]
+        // Transposing to row-major gives:
+        // Row0: [ f/aspect, 0, 0, 0 ]
+        // Row1: [ 0, f, 0, 0 ]
+        // Row2: [ 0, 0, (far+near)/(near-far), -1 ]
+        // Row3: [ 0, 0, (2*far*near)/(near-far),  0 ]
+        const f = 1.0 / Math.tan(fov / 2);
+        const m = new Mat4(
+            f / aspect, 0, 0, 0,
+            0, f, 0, 0,
+            0, 0, (far + near) / (near - far), (2 * far * near) / (near - far),
+            0, 0, -1, 0
+        );
+        this.projectionMatrix = m;
+    }
+}
+
+updateViewMatrix() {
+    // Step 1: Get rotation matrix from Euler angles (YXZ order assumed)
+    const { x, y, z } = this.getGlobalRotation();
+  
+    const cx = Math.cos(x), sx = Math.sin(x);
+    const cy = Math.cos(-y), sy = Math.sin(-y);
+    const cz = Math.cos(z), sz = Math.sin(z);
+  
+    // Build rotation matrix directly (row-major)
+    const r00 = cy * cz + sy * sx * sz;
+    const r01 = -cy * sz + sy * sx * cz;
+    const r02 = sy * cx;
+  
+    const r10 = cx * sz;
+    const r11 = cx * cz;
+    const r12 = -sx;
+  
+    const r20 = -sy * cz + cy * sx * sz;
+    const r21 = sy * sz + cy * sx * cz;
+    const r22 = cy * cx;
+  
+    // Step 2: Transpose rotation for inverse (R^T)
+    const t00 = r00, t01 = r10, t02 = r20;
+    const t10 = r01, t11 = r11, t12 = r21;
+    const t20 = r02, t21 = r12, t22 = r22;
+  
+    // Step 3: Inverse translation = -R^T * position
+    const pos = this.getGlobalPosition();
+    const px = pos.x, py = pos.y, pz = pos.z;
+  
+    const tx = -(t00 * px + t01 * py + t02 * pz);
+    const ty = -(t10 * px + t11 * py + t12 * pz);
+    const tz = -(t20 * px + t21 * py + t22 * pz);
+  
+    // Step 4: Build final view matrix
+    this.viewMatrix = new Mat4(
+        t00, t01, t02, tx,
+        t10, t11, t12, ty,
+        t20, t21, t22, tz,
+        0,   0,   0,   1
+      );
+  }
+
+  lookAt(target) {
     
-        return term1.add(term2).add(term3);
-    }
+    // Get yaw and pitch from target - eye
+    const forward = target.subtract(this.getGlobalPosition()).normalize();
+    // Here, assume that yaw is rotation about Y and pitch about X.
+    const yaw = Math.atan2(forward.x, -forward.z);
+    const pitch = Math.asin(forward.y);
+    const parentRotation = this.parent ? this.parent.getGlobalRotation() : Vec3.zeros();
+    this.transform.rotation.x = pitch - parentRotation.x;
+    this.transform.rotation.y = yaw - parentRotation.y;
+    this.updateViewMatrix();
 
-    lookAt(target) {
-        const forward = target.subtract(this.transform.position).normalize();
-
-        // Get yaw and pitch from the direction vector
-        const yaw = Math.atan2(forward.x, -forward.z); // Y rotation (around up)
-        const pitch = Math.asin(forward.y);            // X rotation (up/down)
-
-        this.transform.rotation.y = yaw;
-        this.transform.rotation.x = pitch;
-
-        this.updateViewMatrix();
-    }
+  }
 }

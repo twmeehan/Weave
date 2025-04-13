@@ -1,9 +1,11 @@
 import { Transform } from './Transform.js';
+import { Vec3 } from '../math/Vec3.js';
 
 export class GameObject {
     constructor(position, rotation, scale) {
       this.transform = new Transform(position, rotation, scale);
 
+      this.name = "Game Object";
       this.children = [];
       this.parent = null;
       this.mesh = null;
@@ -56,5 +58,21 @@ export class GameObject {
 
     getWorldMatrix() {
       return this.transform.objectToWorldMatrix;
+    }
+
+    getGlobalPosition() {
+      return this.transform.objectToWorldMatrix.multiply(new Vec3(0, 0, 0));
+    }
+
+    getGlobalRotation() {
+      return this.parent != null ? this.parent.getGlobalRotation().add(this.transform.rotation) : this.transform.rotation;
+    }
+
+    getGlobalScale() {
+      return this.parent  != null ? this.parent.getGlobalScale().add(this.transform.scale) : this.transform.scale;
+    }
+
+    toString() {
+      return this.name;
     }
   }

@@ -1,5 +1,5 @@
-import { GameObject } from "./GameObject";
-import { Mesh } from "./Mesh";
+import { GameObject } from "../core/GameObject";
+import { Mesh } from "../core/Mesh";
 import { GraphicsContext as WEAVE} from "../GraphicsContext.js";
 
 export class Box extends GameObject {
@@ -35,6 +35,7 @@ export class Box extends GameObject {
           
         const mesh = new Mesh(WEAVE.gl, positions, indices);
         super();
+        this.name = "Box";
         super.setMesh(mesh);
 
     }

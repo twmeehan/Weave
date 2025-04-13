@@ -1,12 +1,15 @@
-import { Box } from './core/Box.js';
+import { Mat4 } from '../weave-3d.esm.js';
+import { Vec3 } from '../weave-3d.esm.js';
+import { Box } from './objects/Box.js';
 import { Camera } from './core/Camera.js';
 import { GameObject } from './core/GameObject.js';
 import { Mesh } from './core/Mesh.js';
 import { Scene } from './core/Scene.js';
+import { Sphere } from './objects/Sphere.js';
 import { GraphicsContext } from './GraphicsContext.js';
 
 export const WEAVE = { 
-    GameObject, Box, Mesh, Camera, Scene,
+    GameObject, Box, Mesh, Camera, Scene, Sphere,
     gl: null,
     canvas: null,
     program: null,
@@ -40,7 +43,7 @@ export const WEAVE = {
         }
         return program;
     }, 
-    init: async function(canvasSelector = "canvas") {
+    init: function(canvasSelector = "canvas") {
 
         this.canvas = document.querySelector(canvasSelector);
         this.gl = this.canvas.getContext("webgl2");
@@ -55,7 +58,7 @@ export const WEAVE = {
         this.canvas.height = window.innerHeight;
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         this.gl.enable(this.gl.DEPTH_TEST);
-        this.gl.clearColor(0.1, 1, 0.1, 1.0);
+        this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
     
         const vertexShaderSrc = `
             attribute vec3 aPosition;
@@ -68,9 +71,10 @@ export const WEAVE = {
 
         const fragmentShaderSrc = `
             precision mediump float;
+            uniform vec4 uColor;
 
             void main() {
-                gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0); // Solid white
+                gl_FragColor = uColor;
             }
 `       ;
 
@@ -83,25 +87,28 @@ export const WEAVE = {
         console.log("init complete.");
     },
 
-    render: function() {
+    render() {
 
         const gl = this.gl;
     
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    
+
         const viewProj = this.camera.projectionMatrix.multiply(this.camera.viewMatrix);
-    
+
+
         this.scene.traverse(obj => {
             if (!obj.visible || !obj.mesh) return;
     
-            const mvp = viewProj.multiply(obj.getWorldMatrix());
-    
+            let mvp = viewProj.multiply(obj.getWorldMatrix());
             const uMVP = gl.getUniformLocation(this.program, "uModelViewProjection");
-            gl.uniformMatrix4fv(uMVP, false, mvp.elements);
+            gl.uniformMatrix4fv(uMVP, true, mvp.elements);
     
             obj.mesh.draw();
         });
+
+        requestAnimationFrame(() => this.render());
     },
+
 
     setActiveScene(scene) {
         this.scene = scene;
