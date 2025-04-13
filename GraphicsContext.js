@@ -1,8 +1,10 @@
 export class GraphicsContext {
     static gl = null;
+    static scene = null;
   
-    static setGL(context) {
+    static setGL(context, scene) {
       this.gl = context;
+      this.scene = scene;
     }
   
     static getGL() {

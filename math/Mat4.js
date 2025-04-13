@@ -1,14 +1,15 @@
 import { Vec3 } from './Vec3.js';
 import { Vec4 } from './Vec4.js';
 
+/*
+ * Represents a 4x4 matrix in row-vector order
+ */
 export class Mat4 {
   constructor(...args) {
-    // If a single array-like argument is given, use it as the element array (assumed row-major).
     if (args.length === 1 && (Array.isArray(args[0]) || args[0] instanceof Float32Array)) {
       this.elements = new Float32Array(args[0]);
     } else {
-      // Otherwise, use the individual arguments (defaulting to the identity matrix).
-      // Now arranged in row-major order:
+
       this.elements = new Float32Array([
         args[0] !== undefined ? args[0] : 1, args[1] !== undefined ? args[1] : 0, args[2] !== undefined ? args[2] : 0, args[3] !== undefined ? args[3] : 0,
         args[4] !== undefined ? args[4] : 0, args[5] !== undefined ? args[5] : 1, args[6] !== undefined ? args[6] : 0, args[7] !== undefined ? args[7] : 0,
@@ -24,10 +25,10 @@ export class Mat4 {
 
   static identity() {
     return new Mat4([
-      1, 0, 0, 0,  // row 0
-      0, 1, 0, 0,  // row 1
-      0, 0, 1, 0,  // row 2
-      0, 0, 0, 1   // row 3
+      1, 0, 0, 0,  
+      0, 1, 0, 0,  
+      0, 0, 1, 0,  
+      0, 0, 0, 1   
     ]);
   }
 
@@ -39,11 +40,10 @@ export class Mat4 {
     return Mat4.fromArray(this.elements);
   }
 
-  // Multiply this matrix by another (immutable, returns a new Mat4)
+  // Multiply this matrix by a scalar, vector, or matrix
   multiply(m) {
+    // Vec4 
     if (m instanceof Vec4) {
-      // For row-major ordering, treating Vec4 as a column vector:
-      // result_i = sum_{j} this[i*4+j] * m_component_j.
       const e = this.elements;
       return new Vec4(
         e[0] * m.x + e[1] * m.y + e[2] * m.z + e[3] * m.w,
@@ -51,21 +51,25 @@ export class Mat4 {
         e[8] * m.x + e[9] * m.y + e[10] * m.z + e[11] * m.w,
         e[12] * m.x + e[13] * m.y + e[14] * m.z + e[15] * m.w
       );
+
+    // Vec3
     } else if (m instanceof Vec3) {
-        const e = this.elements;
-        // Compute the four components, with an implicit w = 1 for the input.
-        const x = e[0] * m.x + e[1] * m.y + e[2] * m.z + e[3];
-        const y = e[4] * m.x + e[5] * m.y + e[6] * m.z + e[7];
-        const z = e[8] * m.x + e[9] * m.y + e[10] * m.z + e[11];
-        const w = e[12] * m.x + e[13] * m.y + e[14] * m.z + e[15];
+      const e = this.elements;
+      // Same as Vec4 but uses w = 1
+      const x = e[0] * m.x + e[1] * m.y + e[2] * m.z + e[3];
+      const y = e[4] * m.x + e[5] * m.y + e[6] * m.z + e[7];
+      const z = e[8] * m.x + e[9] * m.y + e[10] * m.z + e[11];
+      const w = e[12] * m.x + e[13] * m.y + e[14] * m.z + e[15];
         
-        return new Vec3(x, y, z);
-      } else if (m instanceof Mat4) {
+      return new Vec3(x, y, z);
+
+    // Mat4
+    } else if (m instanceof Mat4) {
+
       const a = this.elements;
       const b = m.elements;
       const result = new Float32Array(16);
-      // Row-major multiplication:
-      // result[i*4+j] = sum_{k=0}^{3} a[i*4+k] * b[k*4+j]
+
       for (let i = 0; i < 4; i++) {
         for (let j = 0; j < 4; j++) {
           let sum = 0;
@@ -75,9 +79,12 @@ export class Mat4 {
           result[i*4 + j] = sum;
         }
       }
+
       return new Mat4(result);
+
+    // Scalar  
     } else {
-      // Assume m is a scalar
+      // TODO: handle errors
       const result = new Float32Array(16);
       for (let i = 0; i < 16; i++) {
         result[i] = this.elements[i] * m;
@@ -86,25 +93,11 @@ export class Mat4 {
     }
   }
 
-  // Instead of modifying this, returns a new matrix with given elements (row-major)
-  set(m00, m01, m02, m03,
-      m10, m11, m12, m13,
-      m20, m21, m22, m23,
-      m30, m31, m32, m33) {
-    return new Mat4([
-      m00, m01, m02, m03,
-      m10, m11, m12, m13,
-      m20, m21, m22, m23,
-      m30, m31, m32, m33
-    ]);
-  }
-
   // Return the underlying array.
   toArray() {
     return this.elements;
   }
 
-  // Return a string representation in row-major order.
   toString() {
     const e = this.elements;
     return (
@@ -115,13 +108,15 @@ export class Mat4 {
     );
   }
 
-  // Create a row-major translation matrix and multiply it with this matrix.
+  // TODO: make these more efficient:
+
+
+  // translate this matrix by Vec3 v
   translate(v) {
-    // Row-major translation matrix:
-    // Row0: [1, 0, 0, tx]
-    // Row1: [0, 1, 0, ty]
-    // Row2: [0, 0, 1, tz]
-    // Row3: [0, 0, 0, 1 ]
+    // [1, 0, 0, tx]
+    // [0, 1, 0, ty]
+    // [0, 0, 1, tz]
+    // [0, 0, 0, 1 ]
     const t = Mat4.identity();
     t.elements[3] = v.x;
     t.elements[7] = v.y;
@@ -129,13 +124,12 @@ export class Mat4 {
     return this.multiply(t);
   }
 
-  // Create a row-major scale matrix and multiply.
+  // scale this matrix by Vec3 v
   scale(v) {
-    // Row-major scale matrix:
-    // Row0: [sx, 0,  0,  0]
-    // Row1: [0,  sy, 0,  0]
-    // Row2: [0,  0,  sz, 0]
-    // Row3: [0,  0,  0,  1]
+    // [sx, 0,  0,  0]
+    // [0,  sy, 0,  0]
+    // [0,  0,  sz, 0]
+    // [0,  0,  0,  1]
     const s = Mat4.identity();
     s.elements[0] = v.x;
     s.elements[5] = v.y;
@@ -143,14 +137,14 @@ export class Mat4 {
     return this.multiply(s);
   }
 
-rotate(r) {
-    const { x, y, z } = r // x = pitch, y = yaw, z = roll
+  // rotate this matrix by Vec3 v
+  rotate(v) {
+    const { x, y, z } = v // x = pitch, y = yaw, z = roll
   
     const cx = Math.cos(x), sx = Math.sin(x);
     const cy = Math.cos(y), sy = Math.sin(y);
     const cz = Math.cos(z), sz = Math.sin(z);
   
-    // Combined Y * X * Z rotation matrix (row-major)
     const m00 = cy * cz + sy * sx * sz;
     const m01 = -cy * sz + sy * sx * cz;
     const m02 = sy * cx;

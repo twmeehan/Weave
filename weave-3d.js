@@ -1,5 +1,3 @@
-import { Mat4 } from '../weave-3d.esm.js';
-import { Vec3 } from '../weave-3d.esm.js';
 import { Box } from './objects/Box.js';
 import { Camera } from './core/Camera.js';
 import { GameObject } from './core/GameObject.js';
@@ -8,6 +6,11 @@ import { Scene } from './core/Scene.js';
 import { Sphere } from './objects/Sphere.js';
 import { GraphicsContext } from './GraphicsContext.js';
 
+
+/*
+ * Main class of this library. This class will be imported into various projects
+ * and most other objects can be obtained by using WEAVE._____. 
+ */
 export const WEAVE = { 
     GameObject, Box, Mesh, Camera, Scene, Sphere,
     gl: null,
@@ -15,9 +18,8 @@ export const WEAVE = {
     program: null,
     scene: null,
     renderer: null,
-    uniforms: {},
 
-
+    // Creates a shader from source text
     createShader : function(type, source) {
         const shader = this.gl.createShader(type);
         this.gl.shaderSource(shader, source);
@@ -29,7 +31,8 @@ export const WEAVE = {
         }
         return shader;
     },
-      
+    
+    // Links two shaders together into one program
     createProgram : function(vertSrc, fragSrc) {
         const vert = this.createShader(this.gl.VERTEX_SHADER, vertSrc);
         const frag = this.createShader(this.gl.FRAGMENT_SHADER, fragSrc);
@@ -43,12 +46,16 @@ export const WEAVE = {
         }
         return program;
     }, 
+
+    // Call this at the start of the project to init WebGL
     init: function(canvasSelector = "canvas") {
 
         this.canvas = document.querySelector(canvasSelector);
         this.gl = this.canvas.getContext("webgl2");
+
         // objects within this library will use this to avoid circular dependancies
         GraphicsContext.gl = this.gl;
+    
         if (!this.gl) {
           console.error("WebGL not supported");
           return;
@@ -80,21 +87,19 @@ export const WEAVE = {
 
         this.program = this.createProgram(vertexShaderSrc, fragmentShaderSrc);
         this.gl.useProgram(this.program);
-    
-
-        this.uniforms.uModelViewProjection = this.gl.getUniformLocation(this.program, "uModelViewProjection");
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         console.log("init complete.");
     },
 
+    // Renders every object in the scene by traversing scene hierarchy 
     render() {
 
         const gl = this.gl;
     
         gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
+        // projectionMatrix * viewMatrix of the active camera
         const viewProj = this.camera.projectionMatrix.multiply(this.camera.viewMatrix);
-
 
         this.scene.traverse(obj => {
             if (!obj.visible || !obj.mesh) return;
@@ -102,16 +107,42 @@ export const WEAVE = {
             let mvp = viewProj.multiply(obj.getWorldMatrix());
             const uMVP = gl.getUniformLocation(this.program, "uModelViewProjection");
             gl.uniformMatrix4fv(uMVP, true, mvp.elements);
-    
+
             obj.mesh.draw();
         });
 
-        requestAnimationFrame(() => this.render());
     },
 
+    // Call this to begin the program
+    start() {
+        if (this.scene == null) {
+            throw new Error("Tried to start rendering without a Scene");
+        }
+        this.scene.traverse(obj => {
+            obj.start();
+        });
+        this.loop();
+
+    },
+
+    // This is the loop that runs every frame
+    loop() {
+
+        this.scene.traverse(obj => {
+            obj.update();
+            if (obj.dirty) {
+                obj.updateWorldMatrix();
+                obj.dirty = false;
+            }
+        });
+        this.render();
+        requestAnimationFrame(() => this.loop());
+
+    },
 
     setActiveScene(scene) {
         this.scene = scene;
+        GraphicsContext.scene = scene;
     },
     setActiveCamera(camera) {
         this.camera = camera;

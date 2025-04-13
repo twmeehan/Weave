@@ -1,7 +1,9 @@
 import { Vec3 } from "../math/Vec3.js";
 import { Mat4 } from "../math/Mat4.js";
 
-
+/*
+ * TODO: remove this class and move into GameObject
+ */
 export class Transform {
     constructor(position, rotation, scale) {
       this.position = position ? position : new Vec3();
