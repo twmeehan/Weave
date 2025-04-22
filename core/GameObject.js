@@ -107,4 +107,8 @@ export class GameObject {
     start() {
 
     }
+
+    fixedUpdate() {
+      
+    }
   }

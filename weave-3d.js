@@ -18,6 +18,58 @@ export const WEAVE = {
     program: null,
     scene: null,
     renderer: null,
+    debugWindow: null,
+
+    toggleDebugWindow() {
+
+        if (this.debugWindow && !this.debugWindow.closed) {
+            this.debugWindow.close();
+            this.debugWindow = null;
+            return;
+        }
+
+        this.debugWindow = window.open("", "WeaveDebug", "width=300,height=400,resizable=yes,scrollbars=yes");
+        if (this.debugWindow == null) {
+            console.log("Unable to create pop-up window");
+            return;
+        }
+
+        this.debugWindow.document.addEventListener("keydown", (e) => {
+            if (e.key.toLowerCase() === "d") {
+                this.debugWindow.close();
+                this.debugWindow = null;
+            }
+          });
+
+
+        
+        this.debugWindow.document.write(`
+            <html>
+            <head>
+                <title>WEAVE Debug</title>
+                <style>
+                    body {
+                        background-color: black;
+                        color: #0f0;
+                        font-family: monospace;
+                        font-size: 12px;
+                        padding: 10px;
+                        white-space: pre;
+                    }
+                </style>
+            </head>
+            <body>
+                <div id="fps">FPS: --</div>
+                <div id="hierarchy">Loading...</div>
+            </body>
+            </html>
+        `);
+        window.addEventListener("beforeunload", () => {
+            if (this.debugWindow && !this.debugWindow.closed) {
+              this.debugWindow.close();
+            }
+          });
+    },
 
     // Creates a shader from source text
     createShader : function(type, source) {
@@ -52,6 +104,9 @@ export const WEAVE = {
 
         this.canvas = document.querySelector(canvasSelector);
         this.gl = this.canvas.getContext("webgl2");
+
+        this.frames = 0;
+        this.timeOfLastFPS = performance.now();
 
         // objects within this library will use this to avoid circular dependancies
         GraphicsContext.gl = this.gl;
@@ -123,21 +178,40 @@ export const WEAVE = {
         });
         this.loop();
 
+
+        const interval = 1000 / 60; // 60 Hz = ~16.67 ms
+
+        setInterval(() => {
+            this.scene.traverse(obj => {
+                obj.update();
+                if (obj.dirty) {
+                    obj.updateWorldMatrix();
+                    obj.dirty = false;
+                }
+            });
+        }, interval);
+
     },
 
     // This is the loop that runs every frame
     loop() {
-
-        this.scene.traverse(obj => {
-            obj.update();
-            if (obj.dirty) {
-                obj.updateWorldMatrix();
-                obj.dirty = false;
+        const now = performance.now();
+        this.frames = this.frames + 1;
+        if (now - this.timeOfLastFPS > 1000) {
+            this.timeOfLastFPS = now;
+            let fps = this.frames;
+            this.frames = 0;
+            // Update the debug window if open
+            if (this.debugWindow && !this.debugWindow.closed) {
+                const fpsEl = this.debugWindow.document.getElementById("fps");
+    
+                if (fpsEl) fpsEl.textContent = `FPS: ${fps}`;
             }
-        });
+        }
+    
         this.render();
+    
         requestAnimationFrame(() => this.loop());
-
     },
 
     setActiveScene(scene) {
