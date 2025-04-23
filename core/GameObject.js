@@ -22,6 +22,7 @@ export class GameObject {
       // Set parent to the root by default
       this.parent = null;
       this.children = [];
+      this.depth = 0;
       if (WEAVE.scene) {
         WEAVE.scene.add(this);
       }
@@ -36,8 +37,17 @@ export class GameObject {
   
     // Add a child to this GameObject
     add(child) {
+      if (child.parent && child.parent !== this) {
+        const index = child.parent.children.indexOf(child);
+        if (index !== -1) {
+            child.parent.children.splice(index, 1);
+        }
+      }
       child.parent = this;
-      this.children.push(child);
+      if (!this.children.includes(child)) {
+        this.children.push(child);
+      }
+      child.depth = this.depth + 1;
       this.updateWorldMatrix();
     }
 
@@ -108,7 +118,4 @@ export class GameObject {
 
     }
 
-    fixedUpdate() {
-      
-    }
   }

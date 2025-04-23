@@ -28,7 +28,7 @@ export const WEAVE = {
             return;
         }
 
-        this.debugWindow = window.open("", "WeaveDebug", "width=300,height=400,resizable=yes,scrollbars=yes");
+        this.debugWindow = window.open("", "WeaveDebug", 'width=300,height=400,left=1200,top=0,resizable=yes,scrollbars=yes');
         if (this.debugWindow == null) {
             console.log("Unable to create pop-up window");
             return;
@@ -45,24 +45,66 @@ export const WEAVE = {
         
         this.debugWindow.document.write(`
             <html>
-            <head>
-                <title>WEAVE Debug</title>
-                <style>
-                    body {
-                        background-color: black;
-                        color: #0f0;
-                        font-family: monospace;
-                        font-size: 12px;
-                        padding: 10px;
-                        white-space: pre;
-                    }
-                </style>
-            </head>
-            <body>
+    <head>
+        <title>WEAVE Debug</title>
+        <style>
+            
+
+        body {
+            background-color: white;
+            color: #000;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        #hierarchy {
+            max-height: 360px;
+            overflow-y: auto;
+            flex: 1;
+            border-bottom: 1px solid #ccc;
+            padding: 4px 10px;
+        }
+
+        .node {
+            display: flex;
+            align-items: center;
+            margin: 0;
+            padding: 0;
+            gap: 5px;
+            border-bottom: 1px solid #eee;
+            padding-left: 20px;
+
+        }
+
+        #status-dock {
+            padding: 8px 10px;
+            background-color: #eee;
+            border-top: 1px solid #ccc;
+            display: flex;
+            gap: 20px;
+            justify-content: flex-start;
+        }
+        </style>
+    </head>
+        <body>
+            <script> document.addEventListener("keydown", e => {
+                if (e.key === "d") {
+                    this.close();
+                }
+            });</script>
+            <div id="hierarchy">
+                
+            </div>
+            <div id="status-dock">
                 <div id="fps">FPS: --</div>
-                <div id="hierarchy">Loading...</div>
-            </body>
-            </html>
+                        </div>
+        </body>
+</html>
         `);
         window.addEventListener("beforeunload", () => {
             if (this.debugWindow && !this.debugWindow.closed) {
@@ -192,6 +234,37 @@ export const WEAVE = {
         }, interval);
 
     },
+    updateHierarchy() {
+        if (!this.debugWindow || this.debugWindow.closed) return;
+    
+        const container = this.debugWindow.document.getElementById('hierarchy');
+        if (!container) return;
+        let html = "";
+        let objs = [];
+    
+        this.scene.traverse(obj => {
+            html += `<div class="node" style="padding-left:${obj.depth * 20}px">
+                        <input type="checkbox" class="visibility-toggle" ${obj.visible ? 'checked' : ''}>
+                        ${obj.name}
+                     </div>`;
+            obj.update();
+            if (obj.dirty) {
+                obj.updateWorldMatrix();
+                obj.dirty = false;
+            }
+            objs.push(obj);
+        });
+    
+        container.innerHTML = html;
+    
+        const checkboxes = container.querySelectorAll('input.visibility-toggle');
+        checkboxes.forEach((checkbox, i) => {
+            const obj = objs[i];
+            checkbox.addEventListener('change', () => {
+                obj.visible = checkbox.checked;
+            });
+        });
+    },
 
     // This is the loop that runs every frame
     loop() {
@@ -204,8 +277,9 @@ export const WEAVE = {
             // Update the debug window if open
             if (this.debugWindow && !this.debugWindow.closed) {
                 const fpsEl = this.debugWindow.document.getElementById("fps");
-    
                 if (fpsEl) fpsEl.textContent = `FPS: ${fps}`;
+                this.updateHierarchy();
+
             }
         }
     

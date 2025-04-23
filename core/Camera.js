@@ -25,6 +25,7 @@ export class Camera extends GameObject {
     super(position);
     // Can be orthographic or perspective
     this.cameraType = cameraType;
+    this.name = "Camera";
 
     this.viewMatrix = null;
     this.projectionMatrix = null;
@@ -116,6 +117,7 @@ export class Camera extends GameObject {
   // Moves the camera to be facing a target location
   lookAt(target) {
     
+    this.updateWorldMatrix();
     const forward = target.subtract(this.getGlobalPosition()).normalize();
     const yaw = Math.atan2(forward.x, -forward.z);
     const pitch = Math.asin(forward.y);
