@@ -5,20 +5,24 @@ import { Mesh } from './core/Mesh.js';
 import { Scene } from './core/Scene.js';
 import { Sphere } from './objects/Sphere.js';
 import { GraphicsContext } from './GraphicsContext.js';
-
+import { AmbientLight } from './lights/AmbientLight.js';
+import { DirectionalLight } from './lights/DirectionalLight.js';
+import { Material } from './core/Material.js';
+import { Vec3 } from './math/Vec3.js';
 
 /*
  * Main class of this library. This class will be imported into various projects
  * and most other objects can be obtained by using WEAVE._____. 
  */
 export const WEAVE = { 
-    GameObject, Box, Mesh, Camera, Scene, Sphere,
+    GameObject, Box, Mesh, Camera, Scene, Sphere, AmbientLight, DirectionalLight, Material,
     gl: null,
     canvas: null,
     program: null,
     scene: null,
     renderer: null,
     debugWindow: null,
+    lights: null,
 
     toggleDebugWindow() {
 
@@ -151,7 +155,7 @@ export const WEAVE = {
 
         this.frames = 0;
         this.timeOfLastFPS = performance.now();
-
+        
         // objects within this library will use this to avoid circular dependancies
         GraphicsContext.gl = this.gl;
     
@@ -172,21 +176,91 @@ export const WEAVE = {
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
     
+        this.lights = [];
+        //this.lights.push(new AmbientLight(new Vec3(1,1,1),0.1));
         const vertexShaderSrc = `
             attribute vec3 aPosition;
+            attribute vec3 aNormal;
+
             uniform mat4 uModelViewProjection;
+            uniform mat4 uModel;
+            uniform mat4 uNormalMatrix;
+
+            varying vec3 vNormal;
+            varying vec3 vPosition;
 
             void main() {
+                vec4 worldPos = uModel * vec4(aPosition, 1.0);
+                vPosition = worldPos.xyz;
+                vNormal = mat3(uNormalMatrix) * aNormal;
                 gl_Position = uModelViewProjection * vec4(aPosition, 1.0);
             }
         `;
 
         const fragmentShaderSrc = `
             precision mediump float;
-            uniform vec4 uColor;
+            
+            #define MAX_LIGHTS 8
 
+            struct Light {
+                int   type;
+                vec3  color;
+                float intensity;
+                vec3  direction;
+            };
+            struct Material {
+                vec3 diffuse;
+                vec3 specular;
+                float shininess;
+            };
+
+            uniform int uNumLights;
+            uniform Light uLights[MAX_LIGHTS];
+            uniform Material uMaterial;
+            uniform vec3 uViewPos;
+
+            varying vec3 vNormal;
+            varying vec3 vPosition;
+            
             void main() {
-                gl_FragColor = uColor;
+                vec3 N = normalize(vNormal);
+                vec3 V = normalize(uViewPos - vPosition);
+
+                vec3 result = vec3(0,0,0);
+                
+                for (int i = 0; i < MAX_LIGHTS; ++i) {
+
+                    if (i >= uNumLights) break;
+
+                    Light light = uLights[i];
+
+                    if (light.type == 1) {
+
+                        vec3 L = normalize(-light.direction);
+
+                        // diffuse 
+                        float diff = max(dot(N, L), 0.0);
+                        vec3 diffuse = diff * light.color * uMaterial.diffuse;
+
+                        // specular
+                        vec3 H = normalize(L + V);
+                        float specAngle = max(dot(N, H), 0.0);
+                        float spec = pow(specAngle, uMaterial.shininess);
+                        vec3 specular = spec * light.color * uMaterial.specular;
+
+                        // accumulate
+                        result += (diffuse + specular) * light.intensity;
+                    } else {
+
+                        result += uMaterial.diffuse * light.intensity * light.color;
+                        continue;
+                    }
+
+                    
+                }
+
+                gl_FragColor = vec4(result, 1.0);
+
             }
 `       ;
 
@@ -205,10 +279,20 @@ export const WEAVE = {
 
         // projectionMatrix * viewMatrix of the active camera
         const viewProj = this.camera.projectionMatrix.multiply(this.camera.viewMatrix);
-
+        this.lights.forEach((light, i) => {
+            light.draw(i);
+          });
+        const numLights = gl.getUniformLocation(this.program, "uNumLights");
+        gl.uniform1i(numLights, this.lights.length);
         this.scene.traverse(obj => {
-            if (!obj.visible || !obj.mesh) return;
+            if (!obj.visible || !obj.mesh || !obj.mesh.material) return;
     
+            let modelMat = obj.getWorldMatrix()
+            const uModel = gl.getUniformLocation(this.program, "uModel");
+            gl.uniformMatrix4fv(uModel, true, modelMat.elements);
+            let normalMatrix = modelMat.clone().inverse()
+            const uNormalModel = gl.getUniformLocation(this.program, "uNormalModel");
+            gl.uniformMatrix4fv(uNormalModel, false, normalMatrix.elements);
             let mvp = viewProj.multiply(obj.getWorldMatrix());
             const uMVP = gl.getUniformLocation(this.program, "uModelViewProjection");
             gl.uniformMatrix4fv(uMVP, true, mvp.elements);
@@ -235,6 +319,10 @@ export const WEAVE = {
             this.scene.traverse(obj => {
                 obj.update();
                 if (obj.dirty) {
+                    if (obj == this.camera) {
+                        const uViewPos = this.gl.getUniformLocation(this.program, "uViewPos");
+                        this.gl.uniform3fv(uViewPos, this.camera.position.toArray());
+                    }
                     obj.updateWorldMatrix();
                     obj.dirty = false;
                 }

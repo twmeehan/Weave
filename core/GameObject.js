@@ -25,7 +25,11 @@ export class GameObject {
       this.objectToParentMatrix = new Mat4();
 
       // this is used by the rendering pipeline
-      this.objectToWorldMatrix = new Mat4();      
+      this.objectToWorldMatrix = new Mat4();  
+      
+      // this is used by the rendering pipeline to ensure the normals are facing the right direction
+      this.normalMatrix = new Mat4();
+
       this.name = "Game Object";
       
       // Set parent to the root by default
@@ -37,7 +41,6 @@ export class GameObject {
         WEAVE.scene.add(this);
       }
 
-      this.mesh = null;
       this.visible = true;
 
       // Automatically updates when we first start rendering
@@ -90,6 +93,11 @@ export class GameObject {
       } else {
         this.objectToWorldMatrix = this.objectToParentMatrix.clone();
       }
+
+      this.normalMatrix = this.objectToWorldMatrix
+        .clone()
+        .inverse()
+        .transpose();
 
       for (const child of this.children) {
         child.updateWorldMatrix(false);

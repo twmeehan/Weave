@@ -1,3 +1,5 @@
+import { Material } from "./Material";
+
 export class Mesh {
 
   constructor(gl, positions, normals, indices = null) {
@@ -5,7 +7,7 @@ export class Mesh {
     this.gl = gl;
     this.vertexCount = indices ? indices.length : positions.length / 3;
     this.useIndices = !!indices;
-    this.color = null;
+    this.material = new Material();
     
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
@@ -44,8 +46,19 @@ export class Mesh {
 
     const gl = this.gl;
     const program = gl.getParameter(gl.CURRENT_PROGRAM);
-    const uColor = gl.getUniformLocation(program, "uColor");
-    gl.uniform4fv(uColor, this.color ? this.color.toArray() : [1,1,1,1]);
+
+    gl.uniform3fv(
+      gl.getUniformLocation(program, "uMaterial.diffuse"),
+      this.material.diffuse.toArray()
+    );
+    gl.uniform3fv(
+      gl.getUniformLocation(program, "uMaterial.specular"),
+      this.material.specular.toArray()
+    );
+    gl.uniform1f(
+      gl.getUniformLocation(program, "uMaterial.shininess"),
+      this.material.shininess
+    );
 
     gl.bindVertexArray(this.vao);
     
