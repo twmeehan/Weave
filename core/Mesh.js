@@ -1,6 +1,6 @@
 export class Mesh {
 
-  constructor(gl, positions, indices = null) {
+  constructor(gl, positions, normals, indices = null) {
                 
     this.gl = gl;
     this.vertexCount = indices ? indices.length : positions.length / 3;
@@ -18,6 +18,14 @@ export class Mesh {
     const aPosition = gl.getAttribLocation(program, 'aPosition');
     gl.enableVertexAttribArray(aPosition);
     gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+
+    // Normal buffer  
+    this.normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+    const aNormal = gl.getAttribLocation(program, 'aNormal');
+    gl.enableVertexAttribArray(aNormal);
+    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
     
     // Index buffer (optional)
     if (this.useIndices) {

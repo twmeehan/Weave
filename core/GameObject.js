@@ -1,5 +1,6 @@
-import { Transform } from './Transform.js';
 import { Vec3 } from '../math/Vec3.js';
+import { Mat4 } from '../math/Mat4.js';
+
 import { GraphicsContext as WEAVE} from '../GraphicsContext.js';
 
 /*
@@ -16,12 +17,21 @@ export class GameObject {
 
     constructor(position, rotation, scale) {
 
-      this.transform = new Transform(position, rotation, scale);
+      this.position = position ? position : new Vec3();
+      this.rotation = rotation ? rotation : new Vec3();
+      this.scale = scale ? scale : new Vec3(1, 1, 1);
+
+      // this is used to calculate objectToWorldMatrix
+      this.objectToParentMatrix = new Mat4();
+
+      // this is used by the rendering pipeline
+      this.objectToWorldMatrix = new Mat4();      
       this.name = "Game Object";
       
       // Set parent to the root by default
       this.parent = null;
       this.children = [];
+      
       this.depth = 0;
       if (WEAVE.scene) {
         WEAVE.scene.add(this);
@@ -68,17 +78,17 @@ export class GameObject {
     updateWorldMatrix(updateObjectToParentMatrix = true) {
       let parentMatrix = null;
       if (this.parent != null) {
-          parentMatrix = this.parent.transform.objectToWorldMatrix;
+          parentMatrix = this.parent.objectToWorldMatrix;
       }
       if (updateObjectToParentMatrix) {
-        this.transform.updateObjectToParentMatrix();
+        this.updateObjectToParentMatrix();
       }
     
       if (parentMatrix) {
-        this.transform.objectToWorldMatrix = parentMatrix.clone()
-          .multiply(this.transform.objectToParentMatrix);
+        this.objectToWorldMatrix = parentMatrix.clone()
+          .multiply(this.objectToParentMatrix);
       } else {
-        this.transform.objectToWorldMatrix = this.transform.objectToParentMatrix.clone();
+        this.objectToWorldMatrix = this.objectToParentMatrix.clone();
       }
 
       for (const child of this.children) {
@@ -90,24 +100,33 @@ export class GameObject {
     }
 
     getWorldMatrix() {
-      return this.transform.objectToWorldMatrix;
+      return this.objectToWorldMatrix;
     }
 
     // Global position/rotation/scale account for the transform values of parent objects
     getGlobalPosition() {
-      return this.transform.objectToWorldMatrix.multiply(new Vec3(0, 0, 0));
+      return this.objectToWorldMatrix.multiply(new Vec3(0, 0, 0));
     }
 
     getGlobalRotation() {
-      return this.parent != null ? this.parent.getGlobalRotation().add(this.transform.rotation) : this.transform.rotation;
+      return this.parent != null ? this.parent.getGlobalRotation().add(this.rotation) : this.rotation;
     }
 
     getGlobalScale() {
-      return this.parent  != null ? this.parent.getGlobalScale().add(this.transform.scale) : this.transform.scale;
+      return this.parent  != null ? this.parent.getGlobalScale().add(this.scale) : this.scale;
     }
 
     toString() {
       return this.name;
+    }
+
+    updateObjectToParentMatrix() {
+      const t = Mat4.identity()
+        .translate(this.position)
+        .rotate(this.rotation)
+        .scale(this.scale);
+      
+      this.objectToParentMatrix = t;
     }
 
     update() {
@@ -117,5 +136,6 @@ export class GameObject {
     start() {
 
     }
+    
 
   }

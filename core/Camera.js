@@ -122,8 +122,8 @@ export class Camera extends GameObject {
     const yaw = Math.atan2(forward.x, -forward.z);
     const pitch = Math.asin(forward.y);
     const parentRotation = this.parent ? this.parent.getGlobalRotation() : Vec3.zeros();
-    this.transform.rotation.x = pitch - parentRotation.x;
-    this.transform.rotation.y = yaw - parentRotation.y;
+    this.rotation.x = pitch - parentRotation.x;
+    this.rotation.y = yaw - parentRotation.y;
     this.dirty = true;
 
   }

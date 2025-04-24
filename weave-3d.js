@@ -147,6 +147,8 @@ export const WEAVE = {
         this.canvas = document.querySelector(canvasSelector);
         this.gl = this.canvas.getContext("webgl2");
 
+        const dpr = window.devicePixelRatio || 1;
+
         this.frames = 0;
         this.timeOfLastFPS = performance.now();
 
@@ -158,8 +160,14 @@ export const WEAVE = {
           return;
         }
     
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        const cssWidth  = window.innerWidth;
+        const cssHeight = window.innerHeight;
+        this.canvas.style.width  = cssWidth  + 'px';
+        this.canvas.style.height = cssHeight + 'px';
+
+        this.canvas.width  = cssWidth  * dpr;
+        this.canvas.height = cssHeight * dpr;
+
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         this.gl.enable(this.gl.DEPTH_TEST);
         this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
