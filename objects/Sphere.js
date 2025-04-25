@@ -12,7 +12,7 @@ function generateSphere(radius = 1, latBands = 16, longBands = 16) {
     const sinTheta = Math.sin(theta);
     const cosTheta = Math.cos(theta);
 
-    for (let lon = 0; lon <= longBands; ++lon) {
+    for (let lon = 0; lon < longBands; ++lon) {
       const phi = (lon * 2 * Math.PI) / longBands;
       const sinPhi = Math.sin(phi);
       const cosPhi = Math.cos(phi);
@@ -27,11 +27,13 @@ function generateSphere(radius = 1, latBands = 16, longBands = 16) {
 
   for (let lat = 0; lat < latBands; ++lat) {
     for (let lon = 0; lon < longBands; ++lon) {
-      const first = lat * (longBands + 1) + lon;
-      const second = first + longBands + 1;
+      const current = lat * longBands + lon;
+      const next = current + longBands;
 
-      indices.push(first, second, first + 1);
-      indices.push(second, second + 1, first + 1);
+      const nextLon = (lon + 1) % longBands;
+
+      indices.push(current, next, lat * longBands + nextLon);
+      indices.push(next, next + nextLon - lon, lat * longBands + nextLon);
     }
   }
 
@@ -63,7 +65,7 @@ function computeVertexNormals(positions, indices) {
 
   for (let i = 0; i < normals.length; i += 3) {
     const n = new Vec3(normals[i], normals[i + 1], normals[i + 2]).normalize();
-    normals[i] = -n.x;
+    normals[i]     = -n.x;
     normals[i + 1] = -n.y;
     normals[i + 2] = -n.z;
   }
@@ -72,10 +74,10 @@ function computeVertexNormals(positions, indices) {
 }
 
 export class Sphere extends GameObject {
-    
   constructor(radius = 1, latBands = 16, longBands = 16) {
     const { positions, indices } = generateSphere(radius, latBands, longBands);
-    const mesh = new Mesh(WEAVE.gl, positions, computeVertexNormals(positions, indices), indices);
+    const normals = computeVertexNormals(positions, indices);
+    const mesh = new Mesh(WEAVE.gl, positions, normals, indices);
     super();
     this.name = "Sphere";
     super.setMesh(mesh);
