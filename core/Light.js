@@ -1,13 +1,16 @@
 import { GraphicsContext as WEAVE} from '../GraphicsContext.js';
+import { GameObject } from './GameObject.js';
+import { Vec3 } from '../math/Vec3.js';
 
 export const LightType = {
   AMBIENT:     0,
   DIRECTIONAL: 1,
 };
 
-export class Light {
+export class Light extends GameObject{
 
     constructor(lightType, color, intensity) {
+        super(new Vec3(), new Vec3(), new Vec3());
         this.type = lightType;
         this.color = color;
         this.intensity = intensity;

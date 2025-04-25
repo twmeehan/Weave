@@ -63,9 +63,9 @@ function computeVertexNormals(positions, indices) {
 
   for (let i = 0; i < normals.length; i += 3) {
     const n = new Vec3(normals[i], normals[i + 1], normals[i + 2]).normalize();
-    normals[i] = n.x;
-    normals[i + 1] = n.y;
-    normals[i + 2] = n.z;
+    normals[i] = -n.x;
+    normals[i + 1] = -n.y;
+    normals[i + 2] = -n.z;
   }
 
   return normals;

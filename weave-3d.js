@@ -9,6 +9,7 @@ import { AmbientLight } from './lights/AmbientLight.js';
 import { DirectionalLight } from './lights/DirectionalLight.js';
 import { Material } from './core/Material.js';
 import { Vec3 } from './math/Vec3.js';
+import { Mat4 } from '../weave-3d.esm.js';
 
 /*
  * Main class of this library. This class will be imported into various projects
@@ -177,17 +178,17 @@ export const WEAVE = {
         this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
     
         this.lights = [];
-        //this.lights.push(new AmbientLight(new Vec3(1,1,1),0.1));
-        const vertexShaderSrc = `
-            attribute vec3 aPosition;
-            attribute vec3 aNormal;
+        this.lights.push(new AmbientLight(new Vec3(1,1,1),0.3));
+        const vertexShaderSrc = `#version 300 es
+            in vec3 aPosition;
+            in vec3 aNormal;
 
             uniform mat4 uModelViewProjection;
             uniform mat4 uModel;
             uniform mat4 uNormalMatrix;
 
-            varying vec3 vNormal;
-            varying vec3 vPosition;
+            out vec3 vNormal;
+            out vec3 vPosition;
 
             void main() {
                 vec4 worldPos = uModel * vec4(aPosition, 1.0);
@@ -197,7 +198,7 @@ export const WEAVE = {
             }
         `;
 
-        const fragmentShaderSrc = `
+        const fragmentShaderSrc = `#version 300 es
             precision mediump float;
             
             #define MAX_LIGHTS 8
@@ -219,8 +220,9 @@ export const WEAVE = {
             uniform Material uMaterial;
             uniform vec3 uViewPos;
 
-            varying vec3 vNormal;
-            varying vec3 vPosition;
+            in vec3 vNormal;
+            in vec3 vPosition;
+            out vec4 fragColor;
             
             void main() {
                 vec3 N = normalize(vNormal);
@@ -240,6 +242,7 @@ export const WEAVE = {
 
                         // diffuse 
                         float diff = max(dot(N, L), 0.0);
+                        // vec3 diffuse = diff * light.color * uMaterial.diffuse;
                         vec3 diffuse = diff * light.color * uMaterial.diffuse;
 
                         // specular
@@ -249,6 +252,7 @@ export const WEAVE = {
                         vec3 specular = spec * light.color * uMaterial.specular;
 
                         // accumulate
+                        //result += (diffuse) * light.intensity;
                         result += (diffuse + specular) * light.intensity;
                     } else {
 
@@ -259,7 +263,7 @@ export const WEAVE = {
                     
                 }
 
-                gl_FragColor = vec4(result, 1.0);
+                fragColor = vec4(result, 1.0);
 
             }
 `       ;
@@ -291,7 +295,7 @@ export const WEAVE = {
             const uModel = gl.getUniformLocation(this.program, "uModel");
             gl.uniformMatrix4fv(uModel, true, modelMat.elements);
             let normalMatrix = modelMat.clone().inverse()
-            const uNormalModel = gl.getUniformLocation(this.program, "uNormalModel");
+            const uNormalModel = gl.getUniformLocation(this.program, "uNormalMatrix");
             gl.uniformMatrix4fv(uNormalModel, false, normalMatrix.elements);
             let mvp = viewProj.multiply(obj.getWorldMatrix());
             const uMVP = gl.getUniformLocation(this.program, "uModelViewProjection");
@@ -321,7 +325,7 @@ export const WEAVE = {
                 if (obj.dirty) {
                     if (obj == this.camera) {
                         const uViewPos = this.gl.getUniformLocation(this.program, "uViewPos");
-                        this.gl.uniform3fv(uViewPos, this.camera.position.toArray());
+                        this.gl.uniform3fv(uViewPos, this.camera.getGlobalPosition().toArray());
                     }
                     obj.updateWorldMatrix();
                     obj.dirty = false;
