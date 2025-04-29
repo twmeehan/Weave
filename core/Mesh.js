@@ -1,10 +1,11 @@
 import { Material } from "./Material";
+import { GraphicsContext as WEAVE } from "../GraphicsContext";
 
 export class Mesh {
 
-  constructor(gl, positions, normals, indices = null) {
+  constructor(positions, normals, uvs = [], indices = null) {
                 
-    this.gl = gl;
+    const gl = WEAVE.gl;
     this.vertexCount = indices ? indices.length : positions.length / 3;
     this.useIndices = !!indices;
     this.material = new Material();
@@ -29,6 +30,17 @@ export class Mesh {
     gl.enableVertexAttribArray(aNormal);
     gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
     
+    if (uvs.length > 0) {
+      this.uvBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, this.uvBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uvs), gl.STATIC_DRAW);
+      const aUV = gl.getAttribLocation(program, 'aUV');
+      if (aUV !== -1) {
+        gl.enableVertexAttribArray(aUV);
+        gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 0, 0);
+      }
+    }
+
     // Index buffer (optional)
     if (this.useIndices) {
       this.indexBuffer = gl.createBuffer();
@@ -44,7 +56,7 @@ export class Mesh {
   // Call this for every render frame
   draw() {
 
-    const gl = this.gl;
+    const gl = WEAVE.gl;
     const program = gl.getParameter(gl.CURRENT_PROGRAM);
 
     gl.uniform3fv(
@@ -59,6 +71,25 @@ export class Mesh {
       gl.getUniformLocation(program, "uMaterial.shininess"),
       this.material.shininess
     );
+
+    const hasTexLoc = gl.getUniformLocation(program, "uMaterial.hasTexture");
+    if (this.material.map) {
+      // bind to texture unit 0
+      gl.activeTexture(gl.TEXTURE0); // Select texture unit 0
+      gl.bindTexture(gl.TEXTURE_2D, this.material.map);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      // point the sampler at unit 0
+      const texLoc = gl.getUniformLocation(program, "uTexture");
+      gl.uniform1i(texLoc, 0);
+
+      gl.uniform1i(hasTexLoc, 1);
+    } else {
+      gl.uniform1i(hasTexLoc, 0);
+    }
+
 
     gl.bindVertexArray(this.vao);
     

@@ -1,6 +1,5 @@
 import { GameObject } from "../core/GameObject";
 import { Mesh } from "../core/Mesh";
-import { GraphicsContext as WEAVE} from "../GraphicsContext.js";
 
 export class Box extends GameObject {
     
@@ -76,8 +75,30 @@ export class Box extends GameObject {
         0, -1, 0,  0, -1, 0,  0, -1, 0,
         0, -1, 0,  0, -1, 0,  0, -1, 0,
       ];
+
+      const uvs = [
+        // Front
+        0, 0, 1, 0, 1, 1,
+        1, 1, 0, 1, 0, 0,
+        // Back (flipped horizontally)
+        1, 0, 0, 0, 0, 1,
+        0, 1, 1, 1, 1, 0,
+        // Left
+        1, 0, 0, 0, 0, 1,
+        0, 1, 1, 1, 1, 0,
+        // Right
+        0, 0, 1, 0, 1, 1,
+        1, 1, 0, 1, 0, 0,
+        // Top
+        0, 1, 0, 0, 1, 0,
+        1, 0, 1, 1, 0, 1,
+        // Bottom (flipped vertically)
+        1, 1, 0, 1, 0, 0,
+        0, 0, 1, 0, 1, 1,
+      ];
+  
           
-      const mesh = new Mesh(WEAVE.gl, positions, normals);
+      const mesh = new Mesh(positions, normals, uvs);
       super();
       this.name = "Box";
       super.setMesh(mesh);

@@ -1,12 +1,13 @@
 import { GameObject } from "../core/GameObject";
 import { Mesh } from "../core/Mesh";
-import { GraphicsContext as WEAVE } from "../GraphicsContext.js";
 import { Vec3 } from "../math/Vec3.js";
 
 function generateSphere(radius = 1, latBands = 16, longBands = 16) {
   const positions = [];
   const indices = [];
+  const uvs = [];
 
+  // build vertices & UVs
   for (let lat = 0; lat <= latBands; ++lat) {
     const theta = (lat * Math.PI) / latBands;
     const sinTheta = Math.sin(theta);
@@ -17,11 +18,16 @@ function generateSphere(radius = 1, latBands = 16, longBands = 16) {
       const sinPhi = Math.sin(phi);
       const cosPhi = Math.cos(phi);
 
+      // positions
       const x = cosPhi * sinTheta;
       const y = cosTheta;
       const z = sinPhi * sinTheta;
-
       positions.push(radius * x, radius * y, radius * z);
+
+      // UVs: u across longitude, v down latitude
+      const u = lon / longBands;
+      const v = 1 - lat / latBands;
+      uvs.push(u, v);
     }
   }
 
@@ -77,7 +83,7 @@ export class Sphere extends GameObject {
   constructor(radius = 1, latBands = 16, longBands = 16) {
     const { positions, indices } = generateSphere(radius, latBands, longBands);
     const normals = computeVertexNormals(positions, indices);
-    const mesh = new Mesh(WEAVE.gl, positions, normals, indices);
+    const mesh = new Mesh(positions, normals, indices);
     super();
     this.name = "Sphere";
     super.setMesh(mesh);
