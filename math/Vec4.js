@@ -31,6 +31,12 @@ export class Vec4 {
   length() {
     return Math.sqrt(this.x ** 2 + this.y ** 2 + this.z ** 2 + this.w ** 2);
   }
+  lengthSq() {
+    return this.x*this.x 
+         + this.y*this.y 
+         + this.z*this.z
+         + this.w*this.w;
+  }
 
   normalize() {
     const len = this.length();

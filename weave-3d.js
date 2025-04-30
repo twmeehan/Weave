@@ -304,6 +304,7 @@ export const WEAVE = {
 
   // Call this to begin the program
   start() {
+    
     if (this.scene == null) {
       throw new Error("Tried to start rendering without a Scene");
     }
@@ -312,11 +313,20 @@ export const WEAVE = {
     });
     this.loop();
 
-    const interval = 1000 / 60; // 60 Hz = ~16.67 ms
+    this.lastTime  = performance.now();
+    const interval = 1000 / 60; // 60 Hz
 
     setInterval(() => {
+      const now = performance.now();
+      const dt  = (now - this.lastTime) / 1000;
+      this.lastTime  = now;
       this.scene.traverse((obj) => {
-        obj.update();
+        if (obj.stopped == false) {
+
+          obj.update(dt);
+        } else {
+          console.log("stopped");
+        }
         if (obj.dirty) {
           if (obj == this.camera) {
             const uViewPos = this.gl.getUniformLocation(
@@ -349,11 +359,6 @@ export const WEAVE = {
                         }>
                         ${obj.name}
                      </div>`;
-      obj.update();
-      if (obj.dirty) {
-        obj.updateWorldMatrix();
-        obj.dirty = false;
-      }
       objs.push(obj);
     });
 

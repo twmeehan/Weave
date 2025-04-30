@@ -20,6 +20,7 @@ export class GameObject {
       this.position = position ? position : new Vec3();
       this.rotation = rotation ? rotation : new Vec3();
       this.scale = scale ? scale : new Vec3(1, 1, 1);
+      this.stopped = false;
 
       // this is used to calculate objectToWorldMatrix
       this.objectToParentMatrix = new Mat4();
@@ -137,7 +138,7 @@ export class GameObject {
       this.objectToParentMatrix = t;
     }
 
-    update() {
+    update(dt) {
 
     }
 

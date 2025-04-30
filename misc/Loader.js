@@ -17,6 +17,7 @@ export class Loader {
     const text = await response.text();
     const lines = text.split('\n');
     const materials = {};
+    const baseURL = new URL(url, window.location.href);
     let current = null;
 
     for (let raw of lines) {
@@ -45,15 +46,34 @@ export class Loader {
             break;
         case 'map_Kd':
           if (current) {
-            const gl = WEAVE.gl;
+            const gl    = WEAVE.gl;
             const image = new Image();
-            image.src = parts[1];
+            image.src = new URL(parts.slice(1).join(' '), baseURL).href;
+
             const texture = gl.createTexture();
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+            gl.texImage2D(
+              gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0,
+              gl.RGBA, gl.UNSIGNED_BYTE,
+              new Uint8Array([255, 255, 255, 255])
+            );
+            materials[current].map = texture;
+
             image.onload = () => {
-                gl.bindTexture(gl.TEXTURE_2D, texture); // Bind the texture
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
-                materials[current].map = texture;
-              };
+              gl.bindTexture(gl.TEXTURE_2D, texture);
+
+              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
+              gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+              gl.texImage2D(
+                gl.TEXTURE_2D, 0,
+                gl.RGBA, gl.RGBA,
+                gl.UNSIGNED_BYTE, image
+              );
+              gl.generateMipmap(gl.TEXTURE_2D);
+            };
           }
           break;
       }
@@ -85,21 +105,29 @@ export class Loader {
       const parts = line.split(/\s+/);
       switch (parts[0]) {
         case 'o':
-          if (finalPos.length > 0) {
-            let mesh = new Mesh(finalPos, finalNorm, finalUV, null);
-            mesh.name = name;
-            meshes.push(mesh);
-            if (mat)
-              mesh.matName = mat;
-            
-          }
-          finalPos = [], finalNorm = [], finalUV = [];
-          mat = null;
-          name = parts[1];
-          break;
-        case 'usemtl':
-          mat = parts[1];
-          break;
+        // flush on new object as you already do
+        if (finalPos.length) {
+          const m = new Mesh(finalPos, finalNorm, finalUV, null);
+          m.name    = name;
+          m.matName = mat;
+          meshes.push(m);
+          finalPos = []; finalNorm = []; finalUV = [];
+        }
+        name = parts[1];
+        mat  = null;
+        break;
+
+      case 'usemtl':
+        // **flush on material change**
+        if (finalPos.length) {
+          const m = new Mesh(finalPos, finalNorm, finalUV, null);
+          m.name    = name;
+          m.matName = mat;
+          meshes.push(m);
+          finalPos = []; finalNorm = []; finalUV = [];
+        }
+        mat = parts[1];
+        break;
         case 'v':
           objPos.push(parts.slice(1).map(Number));
           break;
@@ -154,9 +182,10 @@ export class Loader {
       parent.name = objUrl.split('/').pop().replace(/\.\w+$/, '');
 
       meshes.forEach((mesh, i) => {
-        const matName = mesh.matName;
+        let matName = mesh.matName;
         if (matName && matLib[matName]) {
           mesh.material = matLib[matName];
+
         }
 
         const child = new GameObject();
@@ -179,5 +208,25 @@ export class Loader {
     }
 
     return parent;
+  }
+
+  static async loadMeshes(objUrl, mtlUrl = null) {
+    let matLib = {};
+    if (mtlUrl) {
+      matLib = await Loader.loadMTL(mtlUrl);
+    }
+
+    const meshes = await Loader.loadOBJ(objUrl);
+
+    meshes.forEach((mesh, i) => {
+      let matName = mesh.matName;
+      if (matName && matLib[matName]) {
+        mesh.material = matLib[matName];
+
+      }
+
+    });
+
+    return meshes;
   }
 }
