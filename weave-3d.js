@@ -119,6 +119,7 @@ export const WEAVE = {
             </div>
             <div id="status-dock">
                 <div id="fps">FPS: --</div>
+                <div id="ptr">PTR: --</div>
                         </div>
         </body>
 </html>
@@ -298,7 +299,7 @@ export const WEAVE = {
       const uMVP = gl.getUniformLocation(this.program, "uModelViewProjection");
       gl.uniformMatrix4fv(uMVP, true, mvp.elements);
 
-      obj.mesh.draw();
+      obj.draw();
     });
   },
 
@@ -320,9 +321,12 @@ export const WEAVE = {
       const now = performance.now();
       const dt  = (now - this.lastTime) / 1000;
       this.lastTime  = now;
+      if (this.debugWindow && !this.debugWindow.closed) {
+        const ptrEl = this.debugWindow.document.getElementById("ptr");
+        if (ptrEl) ptrEl.textContent = `PTR: ${1/dt}Hz`;
+      }
       this.scene.traverse((obj) => {
         if (obj.stopped == false) {
-
           obj.update(dt);
         } else {
           console.log("stopped");

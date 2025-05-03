@@ -145,6 +145,10 @@ export class GameObject {
     start() {
 
     }
+
+    draw() {
+      this.mesh.draw();
+    }
     
 
   }
