@@ -1903,4 +1903,4 @@ const WEAVE = {
 };
 
 export { Mat4, Vec3, Vec4, WEAVE };
-//# sourceMappingURL=weave-3d.esm.js.map
+//# sourceMappingURL=weave.esm.js.map
