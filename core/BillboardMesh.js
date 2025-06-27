@@ -48,7 +48,7 @@ export class BillboardMesh {
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,1,2]), gl.STATIC_DRAW);
     const aIndex = gl.getAttribLocation(program, 'aIndex');
     gl.enableVertexAttribArray(aIndex);
-    gl.vertexAttribIPointer(aIndex, 1, gl.INT, 0, 0);
+    gl.vertexAttribPointer(aIndex, 1, gl.FLOAT, false, 0, 0);
 
     // Normal buffer  
     this.normalBuffer = gl.createBuffer();

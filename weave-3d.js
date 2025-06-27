@@ -192,6 +192,8 @@ export const WEAVE = {
 
     this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     this.gl.enable(this.gl.DEPTH_TEST);
+    this.gl.enable(this.gl.BLEND);
+    this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
     this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     const vertexShaderSrc = `#version 300 es
@@ -275,7 +277,7 @@ export const WEAVE = {
       in vec3 aPosition;
       in vec3 aNormal;
       in vec2 aUV;
-      in int aIndex;
+      in float aIndex;
 
       uniform mat4 uModelViewProjection;
       uniform mat4 uModel;
@@ -294,12 +296,12 @@ export const WEAVE = {
 
           vec4 pos = uModelViewProjection * vec4(aPosition, 1.0);
 
-          if (aIndex == 0) {
+          if (aIndex == 0.0) {
               pos.xyz += vec3(-0.5, -0.5, 0.0);
-          } else if (aIndex == 1) {
+          } else if (aIndex == 1.0) {
               pos.xyz += vec3(0.5, -0.5, 0.0);
-          } else if (aIndex == 2) {
-              pos = uModelViewProjection * vec4(0.0, 0.5, 0.0, 1.0);
+          } else if (aIndex == 2.0) {
+              pos.xyz += vec3(0.0, 1.25, 0.0);
           }
 
           gl_Position = pos;
@@ -338,38 +340,11 @@ export const WEAVE = {
       out vec4 fragColor;
 
       void main() {
-        vec3 baseColor = uMaterial.hasTexture ? texture(uTexture, vUV).rgb : uMaterial.diffuse;
+        vec4 texColor = texture(uTexture, vUV);
+        vec3 baseColor = uMaterial.hasTexture ? texColor.rgb : uMaterial.diffuse;
+        float alpha = uMaterial.hasTexture ? texColor.a : 1.0;
         
-        // For billboards, we can use a simplified lighting model
-        // since the normal is always facing the camera
-        vec3 N = normalize(vNormal);
-        vec3 V = normalize(uViewPos - vPosition);
-        vec3 result = vec3(0);
-        
-        for (int i = 0; i < uNumLights; ++i) {
-          Light light = uLights[i];
-          
-          if (light.type == 0) {
-            // Ambient light
-            result += baseColor * light.color * light.intensity;
-          } else if (light.type == 1) {
-            // Directional light
-            vec3 L = normalize(-light.direction);
-            float diff = max(dot(N, L), 0.0);
-            vec3 diffuse = diff * light.color * baseColor;
-            
-            vec3 specular = vec3(0);
-            if (uMaterial.shininess > 0.0) {
-              vec3 H = normalize(L + V);
-              float s = pow(max(dot(N, H), 0.0), uMaterial.shininess);
-              specular = s * light.color * uMaterial.specular;
-            }
-            
-            result += (diffuse + specular) * light.intensity;
-          }
-        }
-        
-        fragColor = vec4(result, 1.0);
+        fragColor = vec4(baseColor, alpha);
       }
     `;
 
