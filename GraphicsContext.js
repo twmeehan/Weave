@@ -7,10 +7,14 @@
 export class GraphicsContext {
     static gl = null;
     static scene = null;
+    static billboardProgram = null;
+    static program = null;
   
-    static setGL(context, scene) {
+    static setGL(context, scene, billboardProgram, program) {
       this.gl = context;
       this.scene = scene;
+      this.billboardProgram = billboardProgram;
+      this.program = program;
     }
   
     static getGL() {

@@ -47,9 +47,14 @@ box.update = (dt) => {
     box.dirty = true;
 }
 
-let obj = new WEAVE.GameObject();
-obj.mesh = box;
-scene.add(obj);
+
+// Create a billboard that will always face the camera
+let billboard = new WEAVE.Billboard(new Vec3(2, 2, 0), 1.0);
+billboard.mesh.material = new WEAVE.Material(new Vec3(1,0,0),new Vec3(0,1,0),new Vec3(0,0,1),10);
+billboard.setTexture(await WEAVE.Loader.loadTexture('texture.png'));
+scene.add(billboard);
+
+
 // Call start to begin the program loop
 WEAVE.start();
 

@@ -8,6 +8,45 @@ import { Vec3 } from "../math/Vec3";
  */
 export class Loader {
   /**
+   * Load a texture from a URL and return a WebGL texture object
+   * @param {string} url - path to the texture image
+   * @returns {Promise<WebGLTexture>}
+   */
+  static async loadTexture(url) {
+    const gl = WEAVE.gl;
+    
+    return new Promise((resolve, reject) => {
+      const texture = gl.createTexture();
+      const image = new Image();
+      
+      image.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        
+        gl.texImage2D(
+          gl.TEXTURE_2D, 0,
+          gl.RGBA, gl.RGBA,
+          gl.UNSIGNED_BYTE, image
+        );
+        gl.generateMipmap(gl.TEXTURE_2D);
+        
+        resolve(texture);
+      };
+      
+      image.onerror = () => {
+        reject(new Error(`Failed to load texture: ${url}`));
+      };
+      
+      image.src = url;
+    });
+  }
+
+  /**
    * Load and parse a .mtl file, returning a map of material name → Material
    * @param {string} url - path to the .mtl file
    * @returns {Promise<Object<string, Material>>}

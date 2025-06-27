@@ -455,10 +455,14 @@ class Mat4 {
 class GraphicsContext {
     static gl = null;
     static scene = null;
+    static billboardProgram = null;
+    static program = null;
   
-    static setGL(context, scene) {
+    static setGL(context, scene, billboardProgram, program) {
       this.gl = context;
       this.scene = scene;
+      this.billboardProgram = billboardProgram;
+      this.program = program;
     }
   
     static getGL() {
@@ -642,7 +646,7 @@ class Mesh {
     this.positionBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
-    const program = gl.getParameter(gl.CURRENT_PROGRAM);
+    const program = GraphicsContext.program;
     const aPosition = gl.getAttribLocation(program, 'aPosition');
     gl.enableVertexAttribArray(aPosition);
     gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
@@ -1057,6 +1061,143 @@ class Sphere extends GameObject {
   }
 }
 
+class BillboardMesh {
+
+  constructor(size = 1.0) {
+    const gl = GraphicsContext.gl;
+    this.size = size;
+    this.material = new Material();
+    
+    const positions = [
+      // Triangle 1
+       0, 0, 0,  // bottom-left
+       0, 0, 0,  // bottom-right
+       0, 0, 0,  // top-right
+
+    ];
+    
+    // Normals (will be calculated in shader)
+    const normals = [
+      0, 0, 1, 0, 0, 1, 0, 0, 1,
+      0, 0, 1, 0, 0, 1, 0, 0, 1
+    ];
+    
+    // UV coordinates for texture mapping
+    const uvs = [
+      0, 0,  // bottom-left
+      1, 0,  // bottom-right
+      0.5, 1,  // top-right
+    ];
+    
+    this.vertexCount = 3;
+    
+    this.vao = gl.createVertexArray();
+    gl.bindVertexArray(this.vao);
+    
+    // Position buffer
+    this.positionBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
+    const program = GraphicsContext.billboardProgram;
+    const aPosition = gl.getAttribLocation(program, 'aPosition');
+    gl.enableVertexAttribArray(aPosition);
+    gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+
+    this.indexBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,1,2]), gl.STATIC_DRAW);
+    const aIndex = gl.getAttribLocation(program, 'aIndex');
+    gl.enableVertexAttribArray(aIndex);
+    gl.vertexAttribIPointer(aIndex, 1, gl.INT, 0, 0);
+
+    // Normal buffer  
+    this.normalBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(normals), gl.STATIC_DRAW);
+    const aNormal = gl.getAttribLocation(program, 'aNormal');
+    gl.enableVertexAttribArray(aNormal);
+    gl.vertexAttribPointer(aNormal, 3, gl.FLOAT, false, 0, 0);
+    
+    // UV buffer
+    this.uvBuffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.uvBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(uvs), gl.STATIC_DRAW);
+    const aUV = gl.getAttribLocation(program, 'aUV');
+    if (aUV !== -1) {
+      gl.enableVertexAttribArray(aUV);
+      gl.vertexAttribPointer(aUV, 2, gl.FLOAT, false, 0, 0);
+    }
+    
+    gl.bindVertexArray(null);
+    gl.bindBuffer(gl.ARRAY_BUFFER, null);
+  }
+  
+  // Call this for every render frame
+  draw() {
+    const gl = GraphicsContext.gl;
+    const program = gl.getParameter(gl.CURRENT_PROGRAM); 
+
+    // Set material properties
+    gl.uniform3fv(
+      gl.getUniformLocation(program, "uMaterial.diffuse"),
+      this.material.diffuse.toArray()
+    );
+    gl.uniform3fv(
+      gl.getUniformLocation(program, "uMaterial.specular"),
+      this.material.specular.toArray()
+    );
+    gl.uniform1f(
+      gl.getUniformLocation(program, "uMaterial.shininess"),
+      this.material.shininess
+    );
+
+    const hasTexLoc = gl.getUniformLocation(program, "uMaterial.hasTexture");
+    if (this.material.map) {
+      // bind to texture unit 0
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, this.material.map);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.generateMipmap(gl.TEXTURE_2D);
+      
+      // point the sampler at unit 0
+      const texLoc = gl.getUniformLocation(program, "uTexture");
+      gl.uniform1i(texLoc, 0);
+      gl.uniform1i(hasTexLoc, 1);
+    } else {
+      gl.uniform1i(hasTexLoc, 0);
+    }
+
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, this.vertexCount);
+    gl.bindVertexArray(null);
+  }
+}
+
+class Billboard extends GameObject {
+  
+  constructor(position, size = 1.0) {
+    super(position);
+    this.name = "Billboard";
+    
+    this.mesh = new BillboardMesh(size);
+    this.setMesh(this.mesh);
+  }
+  
+  setTexture(texture) {
+    this.mesh.material.map = texture;
+  }
+  
+  setSize(size) {
+    this.mesh.size = size;
+  }
+  
+  getMaterial() {
+    return this.mesh.material;
+  }
+}
+
 const LightType = {
   AMBIENT:     0,
   DIRECTIONAL: 1,
@@ -1284,6 +1425,45 @@ class CameraController {
  * A simple OBJ and MTL loader for Weave-3D
  */
 class Loader {
+  /**
+   * Load a texture from a URL and return a WebGL texture object
+   * @param {string} url - path to the texture image
+   * @returns {Promise<WebGLTexture>}
+   */
+  static async loadTexture(url) {
+    const gl = GraphicsContext.gl;
+    
+    return new Promise((resolve, reject) => {
+      const texture = gl.createTexture();
+      const image = new Image();
+      
+      image.onload = () => {
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        
+        gl.texImage2D(
+          gl.TEXTURE_2D, 0,
+          gl.RGBA, gl.RGBA,
+          gl.UNSIGNED_BYTE, image
+        );
+        gl.generateMipmap(gl.TEXTURE_2D);
+        
+        resolve(texture);
+      };
+      
+      image.onerror = () => {
+        reject(new Error(`Failed to load texture: ${url}`));
+      };
+      
+      image.src = url;
+    });
+  }
+
   /**
    * Load and parse a .mtl file, returning a map of material name → Material
    * @param {string} url - path to the .mtl file
@@ -1518,6 +1698,8 @@ const WEAVE = {
   Camera,
   Scene,
   Sphere,
+  Billboard,
+  BillboardMesh,
   AmbientLight,
   DirectionalLight,
   Material,
@@ -1526,6 +1708,7 @@ const WEAVE = {
   gl: null,
   canvas: null,
   program: null,
+  billboardProgram: null,
   scene: null,
   renderer: null,
   debugWindow: null,
@@ -1685,31 +1868,122 @@ const WEAVE = {
     this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
 
     const vertexShaderSrc = `#version 300 es
-            in vec3 aPosition;
-            in vec3 aNormal;
-            in vec2 aUV;
+      in vec3 aPosition;
+      in vec3 aNormal;
+      in vec2 aUV;
 
-            uniform mat4 uModelViewProjection;
-            uniform mat4 uModel;
-            uniform mat4 uNormalMatrix;
+      uniform mat4 uModelViewProjection;
+      uniform mat4 uModel;
+      uniform mat4 uNormalMatrix;
 
-            out vec3 vNormal;
-            out vec3 vPosition;
-            out vec2 vUV;
+      out vec3 vNormal;
+      out vec3 vPosition;
+      out vec2 vUV;
 
-            void main() {
-                vec4 worldPos = uModel * vec4(aPosition, 1.0);
-                vPosition = worldPos.xyz;
-                vNormal = mat3(uNormalMatrix) * aNormal;
-                vUV = aUV;
-                gl_Position = uModelViewProjection * vec4(aPosition, 1.0);
-            }
+      void main() {
+          vec4 worldPos = uModel * vec4(aPosition, 1.0);
+          vPosition = worldPos.xyz;
+          vNormal = mat3(uNormalMatrix) * aNormal;
+          vUV = aUV;
+          gl_Position = uModelViewProjection * vec4(aPosition, 1.0);
+      }
         `;
 
     const fragmentShaderSrc = `#version 300 es
-    precision mediump float;
+      precision mediump float;
 
-    #define MAX_LIGHTS 8
+      #define MAX_LIGHTS 8
+
+        struct Light {
+          int   type;
+          vec3  color;
+          float intensity;
+          vec3  direction;
+        };
+        struct Material {
+          vec3 diffuse;
+          vec3 specular;
+          float shininess;
+          bool hasTexture;
+        };
+
+        uniform int uNumLights;
+        uniform Light uLights[MAX_LIGHTS];
+        uniform Material uMaterial;
+        uniform sampler2D uTexture;
+        uniform vec3 uViewPos;
+
+        in vec3 vNormal;
+        in vec3 vPosition;
+        in vec2 vUV;
+        out vec4 fragColor;
+
+        void main() {
+          vec3 baseColor = uMaterial.hasTexture ? texture(uTexture, vUV).rgb : uMaterial.diffuse;
+          vec3 N = normalize(vNormal);
+          vec3 V = normalize(uViewPos - vPosition);
+          vec3 result = vec3(0);
+          for (int i = 0; i < uNumLights; ++i) {
+            Light light = uLights[i];
+            vec3 L = light.type == 1 ? normalize(-light.direction) : vec3(0);
+            float diff = light.type == 1 ? max(dot(N, L), 0.0) : 0.0;
+            vec3 diffuse = diff * light.color * baseColor;
+            vec3 specular = vec3(0);
+            if (light.type == 1 && uMaterial.shininess > 0.0) {
+              vec3 H = normalize(L + V);
+              float s = pow(max(dot(N, H), 0.0), uMaterial.shininess);
+              specular = s * light.color * uMaterial.specular;
+            }
+            if (light.type == 0) result += baseColor * light.color * light.intensity;
+            else result += (diffuse + specular) * light.intensity;
+          }
+          fragColor = vec4(result, 1.0);
+      }
+    `;
+
+    // Billboard vertex shader
+    const billboardVertexShaderSrc = `#version 300 es
+      precision mediump float;
+
+      in vec3 aPosition;
+      in vec3 aNormal;
+      in vec2 aUV;
+      in int aIndex;
+
+      uniform mat4 uModelViewProjection;
+      uniform mat4 uModel;
+      uniform mat4 uNormalMatrix;
+      uniform mat4 uViewMatrix;
+
+      out vec3 vNormal;
+      out vec3 vPosition;
+      out vec2 vUV;
+
+      void main() {
+          vec4 worldPos = uModel * vec4(aPosition, 1.0);
+          vPosition = worldPos.xyz;
+          vNormal = mat3(uNormalMatrix) * aNormal;
+          vUV = aUV;
+
+          vec4 pos = uModelViewProjection * vec4(aPosition, 1.0);
+
+          if (aIndex == 0) {
+              pos.xyz += vec3(-0.5, -0.5, 0.0);
+          } else if (aIndex == 1) {
+              pos.xyz += vec3(0.5, -0.5, 0.0);
+          } else if (aIndex == 2) {
+              pos = uModelViewProjection * vec4(0.0, 0.5, 0.0, 1.0);
+          }
+
+          gl_Position = pos;
+      }
+    `;
+
+    // Billboard fragment shader
+    const billboardFragmentShaderSrc = `#version 300 es
+      precision mediump float;
+
+      #define MAX_LIGHTS 8
 
       struct Light {
         int   type;
@@ -1717,6 +1991,7 @@ const WEAVE = {
         float intensity;
         vec3  direction;
       };
+
       struct Material {
         vec3 diffuse;
         vec3 specular;
@@ -1737,29 +2012,46 @@ const WEAVE = {
 
       void main() {
         vec3 baseColor = uMaterial.hasTexture ? texture(uTexture, vUV).rgb : uMaterial.diffuse;
+        
+        // For billboards, we can use a simplified lighting model
+        // since the normal is always facing the camera
         vec3 N = normalize(vNormal);
         vec3 V = normalize(uViewPos - vPosition);
         vec3 result = vec3(0);
+        
         for (int i = 0; i < uNumLights; ++i) {
           Light light = uLights[i];
-          vec3 L = light.type == 1 ? normalize(-light.direction) : vec3(0);
-          float diff = light.type == 1 ? max(dot(N, L), 0.0) : 0.0;
-          vec3 diffuse = diff * light.color * baseColor;
-          vec3 specular = vec3(0);
-          if (light.type == 1 && uMaterial.shininess > 0.0) {
-            vec3 H = normalize(L + V);
-            float s = pow(max(dot(N, H), 0.0), uMaterial.shininess);
-            specular = s * light.color * uMaterial.specular;
+          
+          if (light.type == 0) {
+            // Ambient light
+            result += baseColor * light.color * light.intensity;
+          } else if (light.type == 1) {
+            // Directional light
+            vec3 L = normalize(-light.direction);
+            float diff = max(dot(N, L), 0.0);
+            vec3 diffuse = diff * light.color * baseColor;
+            
+            vec3 specular = vec3(0);
+            if (uMaterial.shininess > 0.0) {
+              vec3 H = normalize(L + V);
+              float s = pow(max(dot(N, H), 0.0), uMaterial.shininess);
+              specular = s * light.color * uMaterial.specular;
+            }
+            
+            result += (diffuse + specular) * light.intensity;
           }
-          if (light.type == 0) result += baseColor * light.color * light.intensity;
-          else result += (diffuse + specular) * light.intensity;
         }
+        
         fragColor = vec4(result, 1.0);
-    }
+      }
     `;
 
     this.program = this.createProgram(vertexShaderSrc, fragmentShaderSrc);
+    this.billboardProgram = this.createProgram(billboardVertexShaderSrc, billboardFragmentShaderSrc);
+    GraphicsContext.program = this.program;
+    GraphicsContext.billboardProgram = this.billboardProgram;
     this.gl.useProgram(this.program);
+
     this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
     console.log("init complete.");
 
@@ -1779,23 +2071,41 @@ const WEAVE = {
     this.lights.forEach((light, i) => {
       light.draw(i);
     });
-    const numLights = gl.getUniformLocation(this.program, "uNumLights");
-    gl.uniform1i(numLights, this.lights.length);
+    
     this.scene.traverse((obj) => {
       if (!obj.visible || !obj.mesh || !obj.mesh.material) return;
 
+      // Check if this is a billboard object
+      const isBillboard = obj.mesh instanceof BillboardMesh;
+      const program = isBillboard ? this.billboardProgram : this.program;
+      
+      gl.useProgram(program);
+      
       let modelMat = obj.getWorldMatrix();
-      const uModel = gl.getUniformLocation(this.program, "uModel");
+      const uModel = gl.getUniformLocation(program, "uModel");
       gl.uniformMatrix4fv(uModel, true, modelMat.elements);
+      
       let normalMatrix = modelMat.clone().inverse();
-      const uNormalModel = gl.getUniformLocation(this.program, "uNormalMatrix");
+      const uNormalModel = gl.getUniformLocation(program, "uNormalMatrix");
       gl.uniformMatrix4fv(uNormalModel, false, normalMatrix.elements);
+      
       let mvp = viewProj.multiply(obj.getWorldMatrix());
-      const uMVP = gl.getUniformLocation(this.program, "uModelViewProjection");
+      const uMVP = gl.getUniformLocation(program, "uModelViewProjection");
       gl.uniformMatrix4fv(uMVP, true, mvp.elements);
+
+      // Set view position for both programs
+      const uViewPos = gl.getUniformLocation(program, "uViewPos");
+      gl.uniform3fv(uViewPos, this.camera.getGlobalPosition().toArray());
+
+      // Set lighting uniforms
+      const numLights = gl.getUniformLocation(program, "uNumLights");
+      gl.uniform1i(numLights, this.lights.length);
 
       obj.draw();
     });
+    
+    // Switch back to main program
+    gl.useProgram(this.program);
   },
 
   // Call this to begin the program
