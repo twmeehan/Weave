@@ -283,6 +283,7 @@ export const WEAVE = {
       uniform mat4 uModel;
       uniform mat4 uNormalMatrix;
       uniform mat4 uViewMatrix;
+      uniform float uSize;
 
       out vec3 vNormal;
       out vec3 vPosition;
@@ -297,11 +298,11 @@ export const WEAVE = {
           vec4 pos = uModelViewProjection * vec4(aPosition, 1.0);
 
           if (aIndex == 0.0) {
-              pos.xyz += vec3(-0.5, -0.5, 0.0);
+              pos.xyz += vec3(-0.5 * uSize, -0.5 * uSize, 0.0);
           } else if (aIndex == 1.0) {
-              pos.xyz += vec3(0.5, -0.5, 0.0);
+              pos.xyz += vec3(0.5 * uSize, -0.5 * uSize, 0.0);
           } else if (aIndex == 2.0) {
-              pos.xyz += vec3(0.0, 1.25, 0.0);
+              pos.xyz += vec3(0.0, 1.25 * uSize, 0.0);
           }
 
           gl_Position = pos;
@@ -438,7 +439,7 @@ export const WEAVE = {
         } else {
           console.log("stopped");
         }
-        if (obj.dirty) {
+        if (obj.isDirty()) {
           if (obj == this.camera) {
             const uViewPos = this.gl.getUniformLocation(
               this.program,
@@ -450,7 +451,6 @@ export const WEAVE = {
             );
           }
           obj.updateWorldMatrix();
-          obj.dirty = false;
         }
       });
     }, interval);

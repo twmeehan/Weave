@@ -3,33 +3,37 @@ import { GraphicsContext as WEAVE } from "../GraphicsContext.js";
 
 export class BillboardMesh {
 
-  constructor(size = 1.0) {
+  constructor(positions, size = 1.0) {
     const gl = WEAVE.gl;
     this.size = size;
     this.material = new Material();
-    
-    const positions = [
-      // Triangle 1
-       0, 0, 0,  // bottom-left
-       0, 0, 0,  // bottom-right
-       0, 0, 0,  // top-right
+        
+    const baseNormals = [ 0, 0, 1 ]; // per vertex
+    const baseUVs = [
+      0, 0,    // bottom-left
+      1, 0,    // bottom-right
+      0.5, 1   // top
+    ];
 
-    ];
-    
-    // Normals (will be calculated in shader)
-    const normals = [
-      0, 0, 1, 0, 0, 1, 0, 0, 1,
-      0, 0, 1, 0, 0, 1, 0, 0, 1
-    ];
-    
-    // UV coordinates for texture mapping
-    const uvs = [
-      0, 0,  // bottom-left
-      1, 0,  // bottom-right
-      0.5, 1,  // top-right
-    ];
-    
-    this.vertexCount = 3;
+    const normals = [];
+    const uvs = [];
+
+    const triangleCount = positions.length / 9; // 9 floats per triangle (3 vertices)
+
+    for (let i = 0; i < triangleCount; i++) {
+      // Push normal per vertex (3x)
+      normals.push(...baseNormals, ...baseNormals, ...baseNormals);
+      
+      // Push uvs (matches vertex order)
+      uvs.push(...baseUVs);
+    }
+
+    this.vertexCount = positions.length / 3;
+
+    const indices = [];
+    for (let i = 0; i < this.vertexCount; i++) {
+      indices.push(i % 3);
+    }
     
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
@@ -45,11 +49,10 @@ export class BillboardMesh {
 
     this.indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,1,2]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.STATIC_DRAW);
     const aIndex = gl.getAttribLocation(program, 'aIndex');
     gl.enableVertexAttribArray(aIndex);
     gl.vertexAttribPointer(aIndex, 1, gl.FLOAT, false, 0, 0);
-
     // Normal buffer  
     this.normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
@@ -76,6 +79,10 @@ export class BillboardMesh {
   draw() {
     const gl = WEAVE.gl;
     const program = gl.getParameter(gl.CURRENT_PROGRAM); 
+
+    // Set size uniform
+    const uSize = gl.getUniformLocation(program, "uSize");
+    gl.uniform1f(uSize, this.size);
 
     // Set material properties
     gl.uniform3fv(

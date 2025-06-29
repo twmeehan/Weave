@@ -3,13 +3,20 @@ import { BillboardMesh } from "../core/BillboardMesh.js";
 
 export class Billboard extends GameObject {
   
-  constructor(position, size = 1.0) {
-    super(position);
+  constructor(size = 1.0) {
+    super();
     this.name = "Billboard";
-    
-    this.mesh = new BillboardMesh(size);
+    const positions = [
+      // Triangle 1
+       0, 0, 0,  // bottom-left
+       0, 0, 0,  // bottom-right
+       0, 0, 0,  // top-right
+
+    ];
+    this.mesh = new BillboardMesh(positions,size);
     this.setMesh(this.mesh);
   }
+
   
   setTexture(texture) {
     this.mesh.material.map = texture;
@@ -17,6 +24,10 @@ export class Billboard extends GameObject {
   
   setSize(size) {
     this.mesh.size = size;
+  }
+  
+  getSize() {
+    return this.mesh.size;
   }
   
   getMaterial() {

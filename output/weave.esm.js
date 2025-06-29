@@ -488,6 +488,7 @@ class GameObject {
       this.position = position ? position : new Vec3();
       this.rotation = rotation ? rotation : new Vec3();
       this.scale = scale ? scale : new Vec3(1, 1, 1);
+      this.lastTransformHash = this.computeTransformHash();
       this.stopped = false;
 
       // this is used to calculate objectToWorldMatrix
@@ -511,9 +512,6 @@ class GameObject {
       }
 
       this.visible = true;
-
-      // Automatically updates when we first start rendering
-      this.dirty = true;
 
     }
   
@@ -617,7 +615,20 @@ class GameObject {
     draw() {
       this.mesh.draw();
     }
-    
+
+    isDirty() {
+      const currentHash = this.computeTransformHash();
+      const dirty = currentHash !== this.lastTransformHash;
+      this.lastTransformHash = currentHash;
+      return dirty;
+    }
+
+    computeTransformHash() {
+      return `${this.position.x},${this.position.y},${this.position.z}|` +
+            `${this.rotation.x},${this.rotation.y},${this.rotation.z}|` +
+            `${this.scale.x},${this.scale.y},${this.scale.z}`;
+    }
+      
 
   }
 
@@ -961,7 +972,6 @@ class Camera extends GameObject {
     const parentRotation = this.parent ? this.parent.getGlobalRotation() : Vec3.zeros();
     this.rotation.x = pitch - parentRotation.x;
     this.rotation.y = yaw - parentRotation.y;
-    this.dirty = true;
 
   }
 }
@@ -1063,33 +1073,37 @@ class Sphere extends GameObject {
 
 class BillboardMesh {
 
-  constructor(size = 1.0) {
+  constructor(positions, size = 1.0) {
     const gl = GraphicsContext.gl;
     this.size = size;
     this.material = new Material();
-    
-    const positions = [
-      // Triangle 1
-       0, 0, 0,  // bottom-left
-       0, 0, 0,  // bottom-right
-       0, 0, 0,  // top-right
+        
+    const baseNormals = [ 0, 0, 1 ]; // per vertex
+    const baseUVs = [
+      0, 0,    // bottom-left
+      1, 0,    // bottom-right
+      0.5, 1   // top
+    ];
 
-    ];
-    
-    // Normals (will be calculated in shader)
-    const normals = [
-      0, 0, 1, 0, 0, 1, 0, 0, 1,
-      0, 0, 1, 0, 0, 1, 0, 0, 1
-    ];
-    
-    // UV coordinates for texture mapping
-    const uvs = [
-      0, 0,  // bottom-left
-      1, 0,  // bottom-right
-      0.5, 1,  // top-right
-    ];
-    
-    this.vertexCount = 3;
+    const normals = [];
+    const uvs = [];
+
+    const triangleCount = positions.length / 9; // 9 floats per triangle (3 vertices)
+
+    for (let i = 0; i < triangleCount; i++) {
+      // Push normal per vertex (3x)
+      normals.push(...baseNormals, ...baseNormals, ...baseNormals);
+      
+      // Push uvs (matches vertex order)
+      uvs.push(...baseUVs);
+    }
+
+    this.vertexCount = positions.length / 3;
+
+    const indices = [];
+    for (let i = 0; i < this.vertexCount; i++) {
+      indices.push(i % 3);
+    }
     
     this.vao = gl.createVertexArray();
     gl.bindVertexArray(this.vao);
@@ -1105,11 +1119,10 @@ class BillboardMesh {
 
     this.indexBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.indexBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0,1,2]), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(indices), gl.STATIC_DRAW);
     const aIndex = gl.getAttribLocation(program, 'aIndex');
     gl.enableVertexAttribArray(aIndex);
     gl.vertexAttribPointer(aIndex, 1, gl.FLOAT, false, 0, 0);
-
     // Normal buffer  
     this.normalBuffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
@@ -1136,6 +1149,10 @@ class BillboardMesh {
   draw() {
     const gl = GraphicsContext.gl;
     const program = gl.getParameter(gl.CURRENT_PROGRAM); 
+
+    // Set size uniform
+    const uSize = gl.getUniformLocation(program, "uSize");
+    gl.uniform1f(uSize, this.size);
 
     // Set material properties
     gl.uniform3fv(
@@ -1177,13 +1194,20 @@ class BillboardMesh {
 
 class Billboard extends GameObject {
   
-  constructor(position, size = 1.0) {
-    super(position);
+  constructor(size = 1.0) {
+    super();
     this.name = "Billboard";
-    
-    this.mesh = new BillboardMesh(size);
+    const positions = [
+      // Triangle 1
+       0, 0, 0,  // bottom-left
+       0, 0, 0,  // bottom-right
+       0, 0, 0,  // top-right
+
+    ];
+    this.mesh = new BillboardMesh(positions,size);
     this.setMesh(this.mesh);
   }
+
   
   setTexture(texture) {
     this.mesh.material.map = texture;
@@ -1191,6 +1215,10 @@ class Billboard extends GameObject {
   
   setSize(size) {
     this.mesh.size = size;
+  }
+  
+  getSize() {
+    return this.mesh.size;
   }
   
   getMaterial() {
@@ -1300,7 +1328,6 @@ class CameraController {
         this.target.y + this.radius * cosPhi,
         this.target.z + this.radius * sinPhi * Math.sin(this.theta)
       );
-      this.camera.dirty = true;
       
       this.camera.lookAt(this.target);
       const uViewPos = GraphicsContext.gl.getUniformLocation(GraphicsContext.gl.getParameter(GraphicsContext.gl.CURRENT_PROGRAM), "uViewPos");
@@ -1666,6 +1693,35 @@ class Loader {
     return parent;
   }
 
+  static async loadParticleSystem(objUrl, texture, size) {
+
+    const response = await fetch(objUrl);
+    const text = await response.text();
+    const lines = text.split('\n');
+
+    let positions = [];
+
+
+    for (let raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const parts = line.split(/\s+/);
+      if (parts[0] == 'v') {
+        positions.push(...parts.slice(1).map(Number));
+        positions.push(...parts.slice(1).map(Number));
+        positions.push(...parts.slice(1).map(Number));
+
+      }
+    }
+
+    let obj = new Billboard(0.01);
+    let mesh = new BillboardMesh(positions,size);
+    obj.setMesh(mesh);
+    obj.mesh.material = new Material(new Vec3(1,0,0),new Vec3(0,1,0),new Vec3(0,0,1),10);
+    obj.setTexture(await this.loadTexture(texture));
+    return obj;
+  }
+
   static async loadMeshes(objUrl, mtlUrl = null) {
     let matLib = {};
     if (mtlUrl) {
@@ -1956,6 +2012,7 @@ const WEAVE = {
       uniform mat4 uModel;
       uniform mat4 uNormalMatrix;
       uniform mat4 uViewMatrix;
+      uniform float uSize;
 
       out vec3 vNormal;
       out vec3 vPosition;
@@ -1970,11 +2027,11 @@ const WEAVE = {
           vec4 pos = uModelViewProjection * vec4(aPosition, 1.0);
 
           if (aIndex == 0.0) {
-              pos.xyz += vec3(-0.5, -0.5, 0.0);
+              pos.xyz += vec3(-0.5 * uSize, -0.5 * uSize, 0.0);
           } else if (aIndex == 1.0) {
-              pos.xyz += vec3(0.5, -0.5, 0.0);
+              pos.xyz += vec3(0.5 * uSize, -0.5 * uSize, 0.0);
           } else if (aIndex == 2.0) {
-              pos.xyz += vec3(0.0, 1.25, 0.0);
+              pos.xyz += vec3(0.0, 1.25 * uSize, 0.0);
           }
 
           gl_Position = pos;
@@ -2111,7 +2168,7 @@ const WEAVE = {
         } else {
           console.log("stopped");
         }
-        if (obj.dirty) {
+        if (obj.isDirty()) {
           if (obj == this.camera) {
             const uViewPos = this.gl.getUniformLocation(
               this.program,
@@ -2123,7 +2180,6 @@ const WEAVE = {
             );
           }
           obj.updateWorldMatrix();
-          obj.dirty = false;
         }
       });
     }, interval);

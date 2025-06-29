@@ -44,7 +44,6 @@ export class CameraController {
         this.target.y + this.radius * cosPhi,
         this.target.z + this.radius * sinPhi * Math.sin(this.theta)
       );
-      this.camera.dirty = true;
       
       this.camera.lookAt(this.target);
       const uViewPos = WEAVE.gl.getUniformLocation(WEAVE.gl.getParameter(WEAVE.gl.CURRENT_PROGRAM), "uViewPos");

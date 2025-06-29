@@ -3,6 +3,8 @@ import { Material } from "../core/Material";
 import { GameObject } from "../core/GameObject";
 import { GraphicsContext as WEAVE} from "../GraphicsContext";
 import { Vec3 } from "../math/Vec3";
+import { BillboardMesh } from "../core/BillboardMesh";
+import { Billboard } from "../objects/Billboard";
 /**
  * A simple OBJ and MTL loader for Weave-3D
  */
@@ -247,6 +249,35 @@ export class Loader {
     }
 
     return parent;
+  }
+
+  static async loadParticleSystem(objUrl, texture, size) {
+
+    const response = await fetch(objUrl);
+    const text = await response.text();
+    const lines = text.split('\n');
+
+    let positions = []
+
+
+    for (let raw of lines) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#')) continue;
+      const parts = line.split(/\s+/);
+      if (parts[0] == 'v') {
+        positions.push(...parts.slice(1).map(Number));
+        positions.push(...parts.slice(1).map(Number));
+        positions.push(...parts.slice(1).map(Number));
+
+      }
+    }
+
+    let obj = new Billboard(0.01);
+    let mesh = new BillboardMesh(positions,size);
+    obj.setMesh(mesh);
+    obj.mesh.material = new Material(new Vec3(1,0,0),new Vec3(0,1,0),new Vec3(0,0,1),10);
+    obj.setTexture(await this.loadTexture(texture));
+    return obj;
   }
 
   static async loadMeshes(objUrl, mtlUrl = null) {

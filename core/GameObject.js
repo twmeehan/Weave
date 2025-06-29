@@ -20,6 +20,7 @@ export class GameObject {
       this.position = position ? position : new Vec3();
       this.rotation = rotation ? rotation : new Vec3();
       this.scale = scale ? scale : new Vec3(1, 1, 1);
+      this.lastTransformHash = this.computeTransformHash()
       this.stopped = false;
 
       // this is used to calculate objectToWorldMatrix
@@ -43,9 +44,6 @@ export class GameObject {
       }
 
       this.visible = true;
-
-      // Automatically updates when we first start rendering
-      this.dirty = true;
 
     }
   
@@ -149,6 +147,19 @@ export class GameObject {
     draw() {
       this.mesh.draw();
     }
-    
+
+    isDirty() {
+      const currentHash = this.computeTransformHash();
+      const dirty = currentHash !== this.lastTransformHash;
+      this.lastTransformHash = currentHash;
+      return dirty;
+    }
+
+    computeTransformHash() {
+      return `${this.position.x},${this.position.y},${this.position.z}|` +
+            `${this.rotation.x},${this.rotation.y},${this.rotation.z}|` +
+            `${this.scale.x},${this.scale.y},${this.scale.z}`;
+    }
+      
 
   }
